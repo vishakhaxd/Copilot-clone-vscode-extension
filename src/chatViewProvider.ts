@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as https from 'https';
+import * as http from 'http';
 
 interface ChatMessage {
     text: string;
@@ -28,10 +30,29 @@ interface VSCodeContext {
         name?: string;
         folders?: string[];
     };
-    terminal?: {
-        activeTerminals: string[];
-        terminalCount: number;
-        note: string;
+    git?: {
+        branch?: string;
+        hasChanges?: boolean;
+        changedFiles?: Array<{
+            file: string;
+            status: string;
+        }>;
+        stagedFiles?: Array<{
+            file: string;
+            status: string;
+        }>;
+        commits?: Array<{
+            hash: string;
+            message: string;
+            author: string;
+            date: string;
+        }>;
+        remotes?: Array<{
+            name: string;
+            url: string;
+        }>;
+        ahead?: number;
+        behind?: number;
     };
     diagnostics?: {
         errors: string[];
@@ -44,10 +65,23 @@ interface VSCodeContext {
         files: string[];
         activeFile?: string;
     };
-    git?: {
-        branch?: string;
-        hasChanges?: boolean;
-        changedFiles?: string[];
+    debugging?: {
+        isDebugging: boolean;
+        breakpoints?: Array<{
+            file: string;
+            line: number;
+            condition?: string;
+        }>;
+        watchExpressions?: Array<{
+            expression: string;
+            value?: string;
+        }>;
+        callStack?: string[];
+        currentFrame?: {
+            file: string;
+            line: number;
+            function: string;
+        };
     };
 }
 
@@ -218,13 +252,121 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 };
             }
 
-            // 3. Get terminal information
-            const terminals = vscode.window.terminals;
-            context.terminal = {
-                activeTerminals: terminals.map(terminal => terminal.name),
-                terminalCount: terminals.length,
-                note: 'VS Code API limitations: Command history and output require terminal integration'
-            };
+            // 3. Get comprehensive Git information
+            try {
+                const gitExtension = vscode.extensions.getExtension('vscode.git');
+                console.log('Git extension found:', !!gitExtension, 'Active:', gitExtension?.isActive);
+                let gitApi = null;
+                
+                if (gitExtension) {
+                    if (!gitExtension.isActive) {
+                        console.log('Activating git extension...');
+                        await gitExtension.activate();
+                    }
+                    gitApi = gitExtension.exports?.getAPI(1);
+                    console.log('Git API obtained:', !!gitApi, 'Repositories:', gitApi?.repositories?.length);
+                }
+                
+                if (gitApi && workspaceFolders) {
+                    const repo = gitApi.repositories.find((r: any) => 
+                        workspaceFolders.some(folder => 
+                            r.rootUri.fsPath === folder.uri.fsPath
+                        )
+                    );
+                    
+                    if (repo) {
+                        const state = repo.state;
+                        context.git = {
+                            branch: state.HEAD?.name || 'detached',
+                            hasChanges: state.workingTreeChanges.length > 0 || state.indexChanges.length > 0
+                        };
+
+                        // Get working tree changes (unstaged)
+                        context.git.changedFiles = state.workingTreeChanges.map((change: any) => ({
+                            file: change.uri.fsPath.replace(workspaceFolders[0].uri.fsPath, '').replace(/^\//, ''),
+                            status: this.getGitStatusString(change.status)
+                        }));
+
+                        // Get staged changes
+                        context.git.stagedFiles = state.indexChanges.map((change: any) => ({
+                            file: change.uri.fsPath.replace(workspaceFolders[0].uri.fsPath, '').replace(/^\//, ''),
+                            status: this.getGitStatusString(change.status)
+                        }));
+
+                        // Get recent commits (if available)
+                        try {
+                            if (state.HEAD?.commit) {
+                                const headCommit = state.HEAD.commit;
+                                context.git.commits = [{
+                                    hash: headCommit.substring(0, 8),
+                                    message: state.HEAD.name ? `HEAD (${state.HEAD.name})` : 'HEAD',
+                                    author: 'Current user',
+                                    date: new Date().toISOString()
+                                }];
+                            } else {
+                                context.git.commits = [];
+                            }
+                        } catch (commitError) {
+                            context.git.commits = [];
+                        }
+
+                        // Get remotes
+                        try {
+                            context.git.remotes = state.remotes?.map((remote: any) => ({
+                                name: remote.name,
+                                url: remote.fetchUrl || remote.pushUrl || 'unknown'
+                            })) || [];
+                        } catch (remoteError) {
+                            context.git.remotes = [];
+                        }
+
+                        // Get ahead/behind status
+                        try {
+                            const head = state.HEAD;
+                            if (head?.ahead !== undefined) {
+                                context.git.ahead = head.ahead;
+                            }
+                            if (head?.behind !== undefined) {
+                                context.git.behind = head.behind;
+                            }
+                        } catch (aheadBehindError) {
+                            // Ahead/behind info not available
+                        }
+                    } else {
+                        // Repository found but no repo object
+                        context.git = { 
+                            branch: 'Repository not initialized in Git extension', 
+                            hasChanges: false,
+                            changedFiles: [],
+                            stagedFiles: [],
+                            commits: [],
+                            remotes: []
+                        };
+                    }
+                } else {
+                    // Git extension not available or not activated
+                    context.git = { 
+                        branch: 'Git extension not available', 
+                        hasChanges: false,
+                        changedFiles: [],
+                        stagedFiles: [],
+                        commits: [],
+                        remotes: []
+                    };
+                }
+            } catch (gitError) {
+                console.error('Git context error:', gitError);
+                // Git info is optional, continue without it
+                const errorMessage = gitError instanceof Error ? gitError.message : 'Unknown error';
+                context.git = { 
+                    branch: `Git error: ${errorMessage}`, 
+                    hasChanges: false,
+                    changedFiles: [],
+                    stagedFiles: [],
+                    commits: [],
+                    remotes: []
+                };
+            }
 
             // 4. Get diagnostics (errors/warnings/info) for all open files
             const allDiagnostics = vscode.languages.getDiagnostics();
@@ -270,25 +412,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 activeFile: activeEditor?.document.uri.fsPath
             };
 
-            // 6. Get Git information (if available)
+            // 6. Get debugging information
             try {
-                const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
-                if (gitExtension && workspaceFolders) {
-                    const repo = gitExtension.getRepository(workspaceFolders[0].uri);
-                    if (repo) {
-                        context.git = {
-                            branch: repo.state.HEAD?.name,
-                            hasChanges: repo.state.workingTreeChanges.length > 0 || repo.state.indexChanges.length > 0,
-                            changedFiles: [
-                                ...repo.state.workingTreeChanges.map((change: any) => `Modified: ${change.uri.fsPath}`),
-                                ...repo.state.indexChanges.map((change: any) => `Staged: ${change.uri.fsPath}`)
-                            ]
-                        };
-                    }
+                const debugSession = vscode.debug.activeDebugSession;
+                context.debugging = {
+                    isDebugging: !!debugSession
+                };
+
+                if (debugSession) {
+                    // Get breakpoints
+                    const breakpoints = vscode.debug.breakpoints;
+                    context.debugging.breakpoints = breakpoints
+                        .filter(bp => bp instanceof vscode.SourceBreakpoint)
+                        .map(bp => {
+                            const sourceBp = bp as vscode.SourceBreakpoint;
+                            return {
+                                file: sourceBp.location.uri.fsPath,
+                                line: sourceBp.location.range.start.line + 1,
+                                condition: sourceBp.condition
+                            };
+                        });
+
+                    // Note: VS Code API doesn't provide direct access to watch expressions or call stack
+                    // These would require debug adapter protocol implementation
+                    context.debugging.watchExpressions = [];
+                    context.debugging.callStack = ["Call stack not accessible via VS Code extension API"];
                 }
-            } catch (gitError) {
-                // Git info is optional, continue without it
-                context.git = { branch: 'unknown', hasChanges: false };
+            } catch (debugError) {
+                context.debugging = { isDebugging: false };
             }
 
         } catch (error) {
@@ -302,124 +453,76 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Gather context before generating response
         const context = await this.gatherVSCodeContext();
         
-        // Enhanced response generation with context
-        const responses = this.getContextualResponses(userMessage, context);
+        // Get response from local API
+        const response = await this.getContextualResponses(userMessage, context);
         
-        // Simulate AI thinking time
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
-        
-        return responses[Math.floor(Math.random() * responses.length)];
+        return response;
     }
 
-    private getContextualResponses(message: string, context?: VSCodeContext): string[] {
-        const lowerMessage = message.toLowerCase();
-        
-        // Build enhanced context information
-        let contextInfo = '';
-        
-        if (context?.activeFile) {
-            const file = context.activeFile;
-            contextInfo += `\n\n📁 **Current Context:**`;
-            contextInfo += `\n• File: ${file.path.split('/').pop()} (${file.language})`;
-            contextInfo += `\n• Line ${file.cursorPosition?.line! + 1}/${file.totalLines}`;
+    private async getContextualResponses(message: string, context?: VSCodeContext): Promise<string> {
+        try {
+            const requestBody = JSON.stringify({
+                message: message,
+                context: context
+            });
+
+            return new Promise((resolve, reject) => {
+                const options = {
+                    hostname: '127.0.0.1', // Using explicit IP instead of localhost
+                    port: 7777,
+                    path: '/cypher-agent',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(requestBody)
+                    }
+                };
+
+                const req = http.request(options, (res) => {
+                    let data = '';
+
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+
+                    res.on('end', () => {
+                        // Check if the response status is not successful
+                        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+                            resolve(`API Error: Received status code ${res.statusCode}. Please check if your API server is running and the endpoint is correct.`);
+                            return;
+                        }
+
+                        try {
+                            const response = JSON.parse(data);
+                            // Assuming the API returns an object with a 'response' field containing the text
+                            // Adjust this based on your actual API response format
+                            const result = response.response || response.message || response.text || response.content || "I received a response from the API, but couldn't parse it properly.";
+                            resolve(result);
+                        } catch (parseError) {
+                            resolve(`API returned non-JSON response: ${data.substring(0, 200)}${data.length > 200 ? '...' : ''}`);
+                        }
+                    });
+                });
+
+                req.on('error', (error) => {
+                    resolve("I'm sorry, I'm having trouble connecting to my processing service right now. Please try again in a moment.");
+                });
+
+                req.on('timeout', () => {
+                    resolve("The request timed out. Please try again.");
+                });
+
+                // Set a timeout
+                req.setTimeout(30000); // 30 seconds timeout
+
+                req.write(requestBody);
+                req.end();
+            });
             
-            if (file.selection) {
-                contextInfo += `\n• Selected: "${file.selection.text.substring(0, 50)}${file.selection.text.length > 50 ? '...' : ''}"`;
-            }
+        } catch (error) {
+            // Fallback response in case of API failure
+            return "I'm sorry, I'm having trouble connecting to my processing service right now. Please try again in a moment.";
         }
-        
-        if (context?.workspace) {
-            contextInfo += `\n• Workspace: ${context.workspace.name}`;
-        }
-        
-        if (context?.diagnostics && context.diagnostics.totalCount > 0) {
-            contextInfo += `\n• Issues: ${context.diagnostics.errors.length} errors, ${context.diagnostics.warnings.length} warnings`;
-        }
-        
-        if (context?.openFiles && context.openFiles.count > 1) {
-            contextInfo += `\n• Open files: ${context.openFiles.count}`;
-        }
-        
-        if (context?.git?.branch) {
-            contextInfo += `\n• Git branch: ${context.git.branch}`;
-            if (context.git.hasChanges) {
-                contextInfo += ` (${context.git.changedFiles?.length || 0} changes)`;
-            }
-        }
-        
-        // Context-aware responses based on current state
-        if (context?.diagnostics?.errors && context.diagnostics.errors.length > 0) {
-            return [
-                `I notice you have ${context.diagnostics.errors.length} error(s) in your code. Let me help you fix them!${contextInfo}`,
-                `There are some errors to address. Would you like me to help debug them?${contextInfo}`,
-                `I see compilation errors. Let's tackle them one by one.${contextInfo}`
-            ];
-        }
-        
-        if (lowerMessage.includes('algorithm') || lowerMessage.includes('complexity')) {
-            return [
-                `Let me help you analyze the algorithm complexity. For most problems, we want to aim for O(n) or O(n log n) solutions.${contextInfo}`,
-                `Great question about algorithms! Let's break down the approach step by step.${contextInfo}`,
-                `When choosing an algorithm, consider the time-space tradeoff. What constraints are you working with?${contextInfo}`
-            ];
-        }
-        
-        if (lowerMessage.includes('leetcode') || lowerMessage.includes('problem')) {
-            return [
-                `LeetCode problems often have multiple solutions. Let's start with a brute force approach and then optimize.${contextInfo}`,
-                `For this type of problem, I'd recommend drawing out a few examples first. What patterns do you notice?${contextInfo}`,
-                `This looks like a classic problem type. Have you considered using a two-pointer technique or sliding window?${contextInfo}`
-            ];
-        }
-        
-        if (lowerMessage.includes('data structure')) {
-            return [
-                `Choosing the right data structure is crucial! What operations do you need to perform most frequently?${contextInfo}`,
-                `Let's think about this: arrays for random access, linked lists for insertions, hash maps for lookups.${contextInfo}`,
-                `The best data structure depends on your use case. What are the main operations you need?${contextInfo}`
-            ];
-        }
-        
-        if (lowerMessage.includes('debug') || lowerMessage.includes('error')) {
-            const errorContext = (context?.diagnostics?.errors && context.diagnostics.errors.length > 0)
-                ? `\n\n🐛 **Current Errors:**\n${context.diagnostics.errors.slice(0, 3).map(err => `• ${err}`).join('\n')}${context.diagnostics.errors.length > 3 ? '\n• ...' : ''}` 
-                : '';
-            
-            return [
-                `Debugging can be tricky! Let's start by identifying where the issue might be occurring.${contextInfo}${errorContext}`,
-                `Common debugging strategies: check edge cases, trace through with small examples, verify your assumptions.${contextInfo}${errorContext}`,
-                `What specific error are you encountering? Let's tackle it step by step.${contextInfo}${errorContext}`
-            ];
-        }
-        
-        if (lowerMessage.includes('optimize') || lowerMessage.includes('improve')) {
-            return [
-                `Optimization is key! Let's look at the current time and space complexity and see where we can improve.${contextInfo}`,
-                `There are usually multiple ways to optimize. Are you looking to improve time complexity, space complexity, or code readability?${contextInfo}`,
-                `Great thinking about optimization! Let's analyze the bottlenecks in your current approach.${contextInfo}`
-            ];
-        }
-        
-        // Context-aware default responses
-        if (context?.activeFile) {
-            const language = context.activeFile.language;
-            const fileName = context.activeFile.path.split('/').pop();
-            
-            return [
-                `I can see you're working on **${fileName}** (${language}). What specific challenge are you facing?${contextInfo}`,
-                `Looking at your current ${language} file, what would you like help with?${contextInfo}`,
-                `I'm here to help with your ${language} code. What's the problem you're trying to solve?${contextInfo}`
-            ];
-        }
-        
-        // Default responses
-        return [
-            "I'm here to help with your coding challenges! What specific problem are you working on?",
-            "Let's tackle this together! Can you share more details about what you're trying to solve?",
-            "Coding problems can be complex, but we can break them down. What's the main challenge you're facing?",
-            "I love helping with algorithms and data structures! What would you like to explore today?",
-            "Every coding problem has a solution. Let's think through this step by step."
-        ];
     }
 
     private restoreMessages() {
@@ -829,5 +932,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     </script>
 </body>
 </html>`;
+    }
+
+    private getGitStatusString(status: number): string {
+        // Git status constants from VS Code Git extension
+        switch (status) {
+            case 0: return 'Untracked';
+            case 1: return 'Modified';
+            case 2: return 'Added';
+            case 3: return 'Deleted';
+            case 4: return 'Renamed';
+            case 5: return 'Copied';
+            case 6: return 'Updated';
+            case 7: return 'Unmerged';
+            default: return 'Unknown';
+        }
     }
 }
