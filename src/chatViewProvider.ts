@@ -111,7 +111,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(
             async (data) => {
                 if (data.type === 'sendMessage') {
-                    await this.handleUserMessage(data.message);
+                    await this.handleUserMessage(data.message, data.mode);
                 }
             }
         );
@@ -129,7 +129,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async handleUserMessage(message: string) {
+    private async handleUserMessage(message: string, mode: string = 'ask') {
         const userMessage: ChatMessage = {
             text: message,
             isUser: true,
@@ -152,7 +152,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         try {
             // Generate AI response
-            const aiResponse = await this.generateAIResponse(message);
+            const aiResponse = await this.generateAIResponse(message, mode);
             const aiMessage: ChatMessage = {
                 text: aiResponse,
                 isUser: false,
@@ -449,20 +449,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return context;
     }
 
-    private async generateAIResponse(userMessage: string): Promise<string> {
+    private async generateAIResponse(userMessage: string, mode: string = 'ask'): Promise<string> {
         // Gather context before generating response
         const context = await this.gatherVSCodeContext();
         
         // Get response from local API
-        const response = await this.getContextualResponses(userMessage, context);
+        const response = await this.getContextualResponses(userMessage, context, mode);
         
         return response;
     }
 
-    private async getContextualResponses(message: string, context?: VSCodeContext): Promise<string> {
+    private async getContextualResponses(message: string, context?: VSCodeContext, mode: string = 'ask'): Promise<string> {
         try {
             const requestBody = JSON.stringify({
                 message: message,
+                mode: mode,
                 context: context
             });
 
@@ -557,7 +558,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data: https:; connect-src *;">
     <title>Cipher</title>
     <style>
         body {
@@ -618,12 +619,161 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-input-background);
             color: var(--vscode-input-foreground);
             border: 1px solid var(--vscode-input-border);
+            white-space: normal;
+        }
+
+        /* Markdown Styles */
+        .message-bubble h1, .message-bubble h2, .message-bubble h3 {
+            margin: 8px 0 4px 0;
+            color: var(--vscode-foreground);
+        }
+
+        .message-bubble h1 {
+            font-size: 1.5em;
+            font-weight: 600;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 4px;
+        }
+
+        .message-bubble h2 {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .message-bubble h3 {
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .message-bubble p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .message-bubble ul, .message-bubble ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .message-bubble li {
+            margin: 4px 0;
+            line-height: 1.5;
+        }
+
+        .message-bubble strong {
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+
+        .message-bubble em {
+            font-style: italic;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .message-bubble .inline-code {
+            background-color: var(--vscode-textCodeBlock-background);
+            color: var(--vscode-textPreformat-foreground);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: var(--vscode-editor-font-family, 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace);
+            font-size: 0.9em;
+        }
+
+        .message-bubble .code-block-container {
+            margin: 12px 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background-color: var(--vscode-textCodeBlock-background);
+            border: 1px solid var(--vscode-panel-border);
+        }
+
+        .message-bubble .code-block-header {
+            background-color: var(--vscode-tab-inactiveBackground);
+            color: var(--vscode-tab-inactiveForeground);
+            padding: 8px 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            text-transform: uppercase;
+        }
+
+        .message-bubble .code-block {
+            background-color: var(--vscode-textCodeBlock-background);
+            color: var(--vscode-textPreformat-foreground);
+            padding: 12px;
+            margin: 0;
+            font-family: var(--vscode-editor-font-family, 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace);
+            font-size: 0.9em;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message-bubble .code-block code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+
+        /* Additional markdown styles */
+        .message-bubble blockquote {
+            border-left: 3px solid var(--vscode-panel-border);
+            margin: 8px 0;
+            padding-left: 12px;
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+        }
+
+        .message-bubble table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            width: 100%;
+        }
+
+        .message-bubble th, .message-bubble td {
+            border: 1px solid var(--vscode-panel-border);
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        .message-bubble th {
+            background-color: var(--vscode-tab-inactiveBackground);
+            font-weight: 600;
+        }
+
+        .message-bubble hr {
+            border: none;
+            border-top: 1px solid var(--vscode-panel-border);
+            margin: 16px 0;
+        }
+
+        /* Links (if any) */
+        .message-bubble a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+        }
+
+        .message-bubble a:hover {
+            color: var(--vscode-textLink-activeForeground);
+            text-decoration: underline;
+        }
+
+        /* Fix paragraph spacing */
+        .message-bubble p:first-child {
+            margin-top: 0;
+        }
+
+        .message-bubble p:last-child {
+            margin-bottom: 0;
         }
 
         .typing-indicator {
             display: none;
             margin-bottom: 16px;
             align-items: flex-start;
+            flex-direction: column;
         }
 
         .typing-bubble {
@@ -632,6 +782,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             border-radius: 18px;
             padding: 12px 16px;
             color: var(--vscode-descriptionForeground);
+            max-width: 80%;
         }
 
         .typing-dots {
@@ -669,6 +820,83 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-sideBar-background);
             border-top: 1px solid var(--vscode-panel-border);
             flex-shrink: 0;
+        }
+
+        .input-top-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+        }
+
+        .mode-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .mode-label {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-right: 8px;
+            line-height: 28px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-select {
+            background-color: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border);
+            border-radius: 6px;
+            padding: 6px 28px 6px 12px;
+            font-family: var(--vscode-font-family);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 100px;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .mode-select:focus {
+            border-color: var(--vscode-focusBorder);
+            box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+        }
+
+        .mode-select:hover {
+            background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--vscode-input-border);
+        }
+
+        .mode-select option {
+            background-color: var(--vscode-dropdown-listBackground);
+            color: var(--vscode-dropdown-foreground);
+            padding: 8px 12px;
+        }
+
+        .mode-dropdown::after {
+            content: '▼';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: var(--vscode-foreground);
+            font-size: 8px;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .mode-dropdown:hover::after {
+            opacity: 1;
         }
 
         .input-row {
@@ -798,17 +1026,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             </div>
         </div>
 
-        <div class="typing-indicator" id="typingIndicator">
-            <div class="typing-bubble">
-                <div class="typing-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+        <div class="input-container">
+            <div class="input-top-row">
+                <span class="mode-label">Mode:</span>
+                <div class="mode-dropdown">
+                    <select id="modeSelect" class="mode-select">
+                        <option value="ask">Ask</option>
+                        <option value="learn">Learn</option>
+                    </select>
                 </div>
             </div>
-        </div>
-
-        <div class="input-container">
             <div class="input-row">
                 <textarea 
                     id="messageInput" 
@@ -828,10 +1055,100 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const messagesContainer = document.getElementById('messagesContainer');
-        const typingIndicator = document.getElementById('typingIndicator');
+        const modeSelect = document.getElementById('modeSelect');
+        let typingIndicator = null;
+
+        // Markdown renderer function
+        function renderMarkdown(text) {
+            // Escape HTML entities first
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;');
+
+            // Code blocks (triple backticks)
+            html = html.replace(/\\\`\\\`\\\`(\\w+)?\\n?([\\s\\S]*?)\\\`\\\`\\\`/g, function(match, lang, code) {
+                const language = lang ? ' data-language="' + lang + '"' : '';
+                const displayLang = lang || 'code';
+                return '<div class="code-block-container"><div class="code-block-header">' + displayLang + '</div><pre class="code-block"' + language + '><code>' + code.trim() + '</code></pre></div>';
+            });
+
+            // Inline code (backticks)
+            html = html.replace(/\\\`([^\\\`\\n]+)\\\`/g, '<code class="inline-code">$1</code>');
+
+            // Bold text
+            html = html.replace(/\\*\\*([^\\*\\n]+)\\*\\*/g, '<strong>$1</strong>');
+            html = html.replace(/__([^_\\n]+)__/g, '<strong>$1</strong>');
+
+            // Italic text (simple version)
+            html = html.replace(/(?:^|\\s)\\*([^\\*\\n]+)\\*(?=\\s|$)/g, ' <em>$1</em>');
+            html = html.replace(/(?:^|\\s)_([^_\\n]+)_(?=\\s|$)/g, ' <em>$1</em>');
+
+            // Headers (must be at start of line)
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Links [text](url)
+            html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank">$1</a>');
+
+            // Process lists - handle bullet points
+            html = html.replace(/^[\\*\\-\\+] (.+)$/gm, '<li>$1</li>');
+            
+            // Process numbered lists
+            html = html.replace(/^\\d+\\. (.+)$/gm, '<li class="numbered">$1</li>');
+
+            // Wrap consecutive list items in ul/ol tags
+            html = html.replace(/(<li>.*?<\\/li>)(\\s*<li>.*?<\\/li>)*/gs, function(match) {
+                return '<ul>' + match + '</ul>';
+            });
+            
+            html = html.replace(/(<li class="numbered">.*?<\\/li>)(\\s*<li class="numbered">.*?<\\/li>)*/gs, function(match) {
+                const cleanMatch = match.replace(/class="numbered"/g, '');
+                return '<ol>' + cleanMatch + '</ol>';
+            });
+
+            // Convert double newlines to paragraph breaks
+            html = html.replace(/\\n\\n+/g, '</p><p>');
+            
+            // Convert single newlines to line breaks
+            html = html.replace(/\\n/g, '<br>');
+
+            // Wrap in paragraph if not already wrapped in block elements
+            if (html.indexOf('<h1>') === -1 && html.indexOf('<h2>') === -1 && html.indexOf('<h3>') === -1 && 
+                html.indexOf('<ul>') === -1 && html.indexOf('<ol>') === -1 && html.indexOf('<div class="code-block') === -1 &&
+                html.indexOf('<p>') === -1) {
+                html = '<p>' + html + '</p>';
+            }
+
+            // Clean up any empty paragraphs
+            html = html.replace(/<p><\\/p>/g, '');
+
+            return html;
+        }
 
         // Initialize send button state
         sendButton.disabled = true;
+
+        // Update placeholder text based on mode
+        function updatePlaceholder() {
+            const mode = modeSelect.value;
+            if (mode === 'learn') {
+                messageInput.placeholder = 'What would you like to learn about?';
+            } else {
+                messageInput.placeholder = 'Ask Cipher...';
+            }
+        }
+
+        // Set initial placeholder
+        updatePlaceholder();
+
+        // Handle mode change
+        modeSelect.addEventListener('change', function() {
+            updatePlaceholder();
+        });
 
         // Auto-resize textarea and handle button state
         messageInput.addEventListener('input', function() {
@@ -860,15 +1177,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             const message = messageInput.value.trim();
             if (!message) return;
             
+            const selectedMode = modeSelect.value;
+            
             // Clear input and reset button state
             messageInput.value = '';
             messageInput.style.height = 'auto';
             sendButton.disabled = true;
 
-            // Send to extension
+            // Send to extension with mode included
             vscode.postMessage({
                 type: 'sendMessage',
-                message: message
+                message: message,
+                mode: selectedMode
             });
         }
 
@@ -880,11 +1200,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             }
 
             const messageDiv = document.createElement('div');
-            messageDiv.className = \`message \${message.isUser ? 'user' : 'assistant'}\`;
+            messageDiv.className = 'message ' + (message.isUser ? 'user' : 'assistant');
             
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
-            bubble.textContent = message.text;
+            
+            // For AI messages, render as markdown; for user messages, keep as plain text
+            if (message.isUser) {
+                bubble.textContent = message.text;
+            } else {
+                bubble.innerHTML = renderMarkdown(message.text);
+            }
             
             messageDiv.appendChild(bubble);
             messagesContainer.appendChild(messageDiv);
@@ -894,16 +1220,45 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         function showTyping() {
+            // Remove existing typing indicator if any
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+            
+            // Create new typing indicator
+            typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
             typingIndicator.style.display = 'flex';
+            
+            const typingBubble = document.createElement('div');
+            typingBubble.className = 'typing-bubble';
+            
+            const typingDots = document.createElement('div');
+            typingDots.className = 'typing-dots';
+            
+            // Create the three dots
+            for (let i = 0; i < 3; i++) {
+                const span = document.createElement('span');
+                typingDots.appendChild(span);
+            }
+            
+            typingBubble.appendChild(typingDots);
+            typingIndicator.appendChild(typingBubble);
+            
+            // Append to bottom of messages container
+            messagesContainer.appendChild(typingIndicator);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
         function hideTyping() {
-            typingIndicator.style.display = 'none';
+            if (typingIndicator) {
+                typingIndicator.remove();
+                typingIndicator = null;
+            }
         }
 
         // Handle messages from extension
-        window.addEventListener('message', event => {
+        window.addEventListener('message', function(event) {
             const message = event.data;
             
             switch (message.type) {
@@ -917,15 +1272,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     hideTyping();
                     break;
                 case 'clearChat':
-                    messagesContainer.innerHTML = \`
-            <div class="welcome-message">
-                <div class="welcome-logo">{  }</div>
-                <div class="welcome-title">Ask Cipher</div>
-                <div class="welcome-subtitle">
-                    Your AI assistant for algorithms, data structures, and coding challenges.
-                </div>
-            </div>
-                    \`;
+                    // Hide typing indicator first
+                    hideTyping();
+                    // Reset messages container
+                    messagesContainer.innerHTML = 
+            '<div class="welcome-message">' +
+                '<div class="welcome-logo">{  }</div>' +
+                '<div class="welcome-title">Ask Cipher</div>' +
+                '<div class="welcome-subtitle">' +
+                    'Your AI assistant for algorithms, data structures, and coding challenges.' +
+                '</div>' +
+            '</div>';
                     break;
             }
         });
