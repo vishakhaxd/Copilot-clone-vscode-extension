@@ -558,19 +558,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data: https:; connect-src *;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; img-src data: https:; connect-src *;">
     <title>Cipher</title>
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
         body {
             font-family: var(--vscode-font-family);
-            background-color: var(--vscode-editor-background);
-            color: var(--vscode-editor-foreground);
+            background-color: #1e1e1e;
+            color: #cccccc;
             margin: 0;
             padding: 0;
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+        }
+
+        /* Global focus outline removal - preserve borders */
+        *, *:focus, *:active, *:hover {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Specifically target form elements */
+        input, textarea, select, button {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        input:focus, textarea:focus, select:focus, button:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
         }
 
         .chat-container {
@@ -585,6 +607,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             overflow-y: auto;
             padding: 16px;
             scroll-behavior: smooth;
+            background-color: #1e1e1e;
         }
 
         .message {
@@ -616,157 +639,283 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .message.assistant .message-bubble {
-            background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
+            background-color: #252525;
+            color: #cccccc;
+            border: 1px solid #404040;
             white-space: normal;
+            max-width: 90%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
-        /* Markdown Styles */
-        .message-bubble h1, .message-bubble h2, .message-bubble h3 {
-            margin: 8px 0 4px 0;
-            color: var(--vscode-foreground);
+        /* Markdown Styles - GitHub Copilot inspired */
+        .message-bubble h1, .message-bubble h2, .message-bubble h3, .message-bubble h4, .message-bubble h5, .message-bubble h6 {
+            margin: 16px 0 8px 0;
+            color: #ffffff;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .message-bubble h1:first-child, .message-bubble h2:first-child, .message-bubble h3:first-child, 
+        .message-bubble h4:first-child, .message-bubble h5:first-child, .message-bubble h6:first-child {
+            margin-top: 0;
         }
 
         .message-bubble h1 {
-            font-size: 1.5em;
-            font-weight: 600;
-            border-bottom: 1px solid var(--vscode-panel-border);
-            padding-bottom: 4px;
+            font-size: 1.6em;
+            border-bottom: 1px solid #404040;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
         }
 
         .message-bubble h2 {
-            font-size: 1.3em;
-            font-weight: 600;
+            font-size: 1.4em;
+            margin-bottom: 12px;
         }
 
         .message-bubble h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .message-bubble h4 {
             font-size: 1.1em;
             font-weight: 600;
         }
 
+        .message-bubble h5 {
+            font-size: 1.05em;
+            font-weight: 600;
+        }
+
+        .message-bubble h6 {
+            font-size: 1em;
+            font-weight: 600;
+            color: #a0a0a0;
+        }
+
         .message-bubble p {
-            margin: 8px 0;
-            line-height: 1.6;
-        }
-
-        .message-bubble ul, .message-bubble ol {
-            margin: 8px 0;
-            padding-left: 20px;
-        }
-
-        .message-bubble li {
-            margin: 4px 0;
-            line-height: 1.5;
-        }
-
-        .message-bubble strong {
-            font-weight: 600;
-            color: var(--vscode-foreground);
-        }
-
-        .message-bubble em {
-            font-style: italic;
-            color: var(--vscode-descriptionForeground);
-        }
-
-        .message-bubble .inline-code {
-            background-color: var(--vscode-textCodeBlock-background);
-            color: var(--vscode-textPreformat-foreground);
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: var(--vscode-editor-font-family, 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace);
-            font-size: 0.9em;
-        }
-
-        .message-bubble .code-block-container {
             margin: 12px 0;
-            border-radius: 6px;
-            overflow: hidden;
-            background-color: var(--vscode-textCodeBlock-background);
-            border: 1px solid var(--vscode-panel-border);
+            line-height: 1.6;
+            color: #cccccc;
         }
 
-        .message-bubble .code-block-header {
-            background-color: var(--vscode-tab-inactiveBackground);
-            color: var(--vscode-tab-inactiveForeground);
-            padding: 8px 12px;
-            font-size: 0.8em;
-            font-weight: 500;
-            border-bottom: 1px solid var(--vscode-panel-border);
-            text-transform: uppercase;
-        }
-
-        .message-bubble .code-block {
-            background-color: var(--vscode-textCodeBlock-background);
-            color: var(--vscode-textPreformat-foreground);
-            padding: 12px;
-            margin: 0;
-            font-family: var(--vscode-editor-font-family, 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace);
-            font-size: 0.9em;
-            line-height: 1.4;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .message-bubble .code-block code {
-            background: none;
-            padding: 0;
-            color: inherit;
-            font-size: inherit;
-        }
-
-        /* Additional markdown styles */
-        .message-bubble blockquote {
-            border-left: 3px solid var(--vscode-panel-border);
-            margin: 8px 0;
-            padding-left: 12px;
-            color: var(--vscode-descriptionForeground);
-            font-style: italic;
-        }
-
-        .message-bubble table {
-            border-collapse: collapse;
-            margin: 8px 0;
-            width: 100%;
-        }
-
-        .message-bubble th, .message-bubble td {
-            border: 1px solid var(--vscode-panel-border);
-            padding: 6px 8px;
-            text-align: left;
-        }
-
-        .message-bubble th {
-            background-color: var(--vscode-tab-inactiveBackground);
-            font-weight: 600;
-        }
-
-        .message-bubble hr {
-            border: none;
-            border-top: 1px solid var(--vscode-panel-border);
-            margin: 16px 0;
-        }
-
-        /* Links (if any) */
-        .message-bubble a {
-            color: var(--vscode-textLink-foreground);
-            text-decoration: none;
-        }
-
-        .message-bubble a:hover {
-            color: var(--vscode-textLink-activeForeground);
-            text-decoration: underline;
-        }
-
-        /* Fix paragraph spacing */
         .message-bubble p:first-child {
             margin-top: 0;
         }
 
         .message-bubble p:last-child {
             margin-bottom: 0;
+        }
+
+        .message-bubble ul, .message-bubble ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+
+        .message-bubble ul {
+            list-style-type: disc;
+        }
+
+        .message-bubble ol {
+            list-style-type: decimal;
+        }
+
+        .message-bubble li {
+            margin: 6px 0;
+            line-height: 1.6;
+            color: #cccccc;
+        }
+
+        .message-bubble li::marker {
+            color: #888888;
+        }
+
+        .message-bubble strong {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .message-bubble em {
+            font-style: italic;
+            color: #d0d0d0;
+        }
+
+        .message-bubble .inline-code {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 10px;
+            border: 1px solid #404040;
+        }
+
+        .message-bubble .code-block-container {
+            margin: 16px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #1e1e1e;
+            border: 1px solid #404040;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .message-bubble .code-block-header {
+            background-color: #2d2d2d;
+            color: #a0a0a0;
+            padding: 10px 16px;
+            font-size: 0.8em;
+            font-weight: 500;
+            border-bottom: 1px solid #404040;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .message-bubble .code-block {
+            background-color: #1e1e1e !important;
+            color: #cccccc;
+            padding: 20px;
+            margin: 0;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 10px;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre;
+            word-wrap: normal;
+            tab-size: 4;
+        }
+
+        .message-bubble .code-block code {
+            background: none !important;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+            font-family: inherit;
+        }
+
+        /* Enhanced VS Code syntax highlighting */
+        .message-bubble .code-block .hljs {
+            background: #1e1e1e !important;
+            color: #d4d4d4 !important;
+        }
+
+        .message-bubble .code-block .hljs-keyword {
+            color: #569cd6 !important;
+            font-weight: normal;
+        }
+
+        .message-bubble .code-block .hljs-string {
+            color: #ce9178 !important;
+        }
+
+        .message-bubble .code-block .hljs-number {
+            color: #b5cea8 !important;
+        }
+
+        .message-bubble .code-block .hljs-comment {
+            color: #6a9955 !important;
+            font-style: italic;
+        }
+
+        .message-bubble .code-block .hljs-function {
+            color: #dcdcaa !important;
+        }
+
+        .message-bubble .code-block .hljs-built_in {
+            color: #4ec9b0 !important;
+        }
+
+        .message-bubble .code-block .hljs-class {
+            color: #4ec9b0 !important;
+        }
+
+        .message-bubble .code-block .hljs-variable {
+            color: #9cdcfe !important;
+        }
+
+        .message-bubble .code-block .hljs-type {
+            color: #4ec9b0 !important;
+        }
+
+        .message-bubble .code-block .hljs-literal {
+            color: #569cd6 !important;
+        }
+
+        .message-bubble .code-block .hljs-operator {
+            color: #d4d4d4 !important;
+        }
+
+        .message-bubble .code-block .hljs-punctuation {
+            color: #d4d4d4 !important;
+        }
+
+        .message-bubble .code-block .hljs-property {
+            color: #9cdcfe !important;
+        }
+
+        .message-bubble .code-block .hljs-attr {
+            color: #92c5f8 !important;
+        }
+
+        .message-bubble .code-block .hljs-tag {
+            color: #569cd6 !important;
+        }
+
+        .message-bubble .code-block .hljs-name {
+            color: #4fc1ff !important;
+        }
+
+        .message-bubble .code-block .hljs-title {
+            color: #dcdcaa !important;
+        }
+
+        .message-bubble .code-block .hljs-params {
+            color: #9cdcfe !important;
+        }
+
+        /* Additional markdown elements */
+        .message-bubble blockquote {
+            border-left: 3px solid #404040;
+            margin: 16px 0;
+            padding: 8px 0 8px 16px;
+            color: #a0a0a0;
+            font-style: italic;
+            background-color: rgba(64, 64, 64, 0.1);
+        }
+
+        .message-bubble table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            border: 1px solid #404040;
+        }
+
+        .message-bubble th, .message-bubble td {
+            border: 1px solid #404040;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .message-bubble th {
+            background-color: #2d2d2d;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .message-bubble hr {
+            border: none;
+            border-top: 1px solid #404040;
+            margin: 20px 0;
+        }
+
+        /* Links styling */
+        .message-bubble a {
+            color: #4fc1ff;
+            text-decoration: none;
+        }
+
+        .message-bubble a:hover {
+            color: #6bb6ff;
+            text-decoration: underline;
         }
 
         .typing-indicator {
@@ -816,144 +965,206 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .input-container {
-            padding: 16px;
-            background-color: var(--vscode-sideBar-background);
-            border-top: 1px solid var(--vscode-panel-border);
+            padding: 12px;
+            background-color: #2b2b2b;
+            border-top: 1px solid #404040;
             flex-shrink: 0;
         }
 
-        .input-top-row {
+        .input-wrapper {
+            background-color: #404040;
+            border: 1px solid transparent;
+            border-radius: 24px;
+            padding: 6px 12px;
             display: flex;
-            justify-content: flex-end;
             align-items: center;
-            margin-bottom: 8px;
-            padding-bottom: 4px;
+            gap: 8px;
+            transition: all 0.2s ease;
+            outline: none !important;
+            box-sizing: border-box;
+            position: relative;
+            background-image: 
+                linear-gradient(#404040, #404040),
+                linear-gradient(90deg, #d6fb41, #a8d132, #d6fb41, #b8e138, #d6fb41);
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+            animation: borderFlow 3s linear infinite;
+        }
+        
+        @keyframes borderFlow {
+            0% {
+                background-position: 0% 0%, 0% 0%;
+            }
+            100% {
+                background-position: 0% 0%, 200% 0%;
+            }
+        }
+
+        .input-wrapper:focus-within {
+            background-image: 
+                linear-gradient(#4a4a4a, #4a4a4a),
+                linear-gradient(90deg, #d6fb41, #a8d132, #d6fb41, #b8e138, #d6fb41);
+            animation: borderFlowFocus 2s linear infinite;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        
+        @keyframes borderFlowFocus {
+            0% {
+                background-position: 0% 0%, 0% 0%;
+            }
+            100% {
+                background-position: 0% 0%, 300% 0%;
+            }
         }
 
         .mode-dropdown {
             position: relative;
-            display: inline-block;
-        }
-
-        .mode-label {
-            font-size: 11px;
-            color: var(--vscode-descriptionForeground);
-            margin-right: 8px;
-            line-height: 28px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            flex-shrink: 0;
         }
 
         .mode-select {
-            background-color: var(--vscode-dropdown-background);
-            color: var(--vscode-dropdown-foreground);
-            border: 1px solid var(--vscode-dropdown-border);
-            border-radius: 6px;
-            padding: 6px 28px 6px 12px;
+            background-color: transparent;
+            color: #999999;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 14px 2px 4px;
             font-family: var(--vscode-font-family);
-            font-size: 12px;
-            font-weight: 500;
+            font-size: 11px;
+            font-weight: 400;
             cursor: pointer;
-            outline: none;
+            outline: none !important;
             appearance: none;
             -webkit-appearance: none;
             -moz-appearance: none;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            min-width: 100px;
-            position: relative;
+            min-width: 40px;
             transition: all 0.2s ease;
-        }
-
-        .mode-select:focus {
-            border-color: var(--vscode-focusBorder);
-            box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+            box-shadow: none !important;
         }
 
         .mode-select:hover {
-            background-color: var(--vscode-list-hoverBackground);
-            border-color: var(--vscode-input-border);
+            background-color: #505050;
+            color: #cccccc;
+            outline: none !important;
+        }
+
+        .mode-select:focus {
+            background-color: #505050;
+            color: #cccccc;
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .mode-select:active {
+            outline: none !important;
+            box-shadow: none !important;
         }
 
         .mode-select option {
-            background-color: var(--vscode-dropdown-listBackground);
-            color: var(--vscode-dropdown-foreground);
-            padding: 8px 12px;
+            background-color: #404040;
+            color: #cccccc;
+            padding: 4px 8px;
+            font-size: 11px;
         }
 
         .mode-dropdown::after {
             content: '▼';
             position: absolute;
-            right: 8px;
+            right: 4px;
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;
-            color: var(--vscode-foreground);
+            color: #999999;
             font-size: 8px;
             opacity: 0.7;
-            transition: opacity 0.2s ease;
-        }
-
-        .mode-dropdown:hover::after {
-            opacity: 1;
-        }
-
-        .input-row {
-            display: flex;
-            gap: 8px;
-            align-items: flex-end;
         }
 
         .message-input {
             flex: 1;
-            background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
-            border-radius: 20px;
-            padding: 12px 16px;
+            background-color: transparent;
+            color: #cccccc;
+            border: none;
+            padding: 6px 8px;
             font-family: var(--vscode-font-family);
-            font-size: 14px;
+            font-size: 13px;
             resize: none;
-            outline: none;
-            min-height: 20px;
+            outline: none !important;
+            min-height: 18px;
+            height: 18px;
             max-height: 120px;
-            overflow-y: auto;
+            overflow-y: hidden;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
             line-height: 1.4;
+            box-shadow: none !important;
+            vertical-align: top;
         }
 
         .message-input:focus {
-            border-color: var(--vscode-focusBorder);
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .message-input:active {
+            outline: none !important;
+            box-shadow: none !important;
         }
 
         .message-input::placeholder {
-            color: var(--vscode-input-placeholderForeground);
+            color: #888888;
+            font-size: 13px;
         }
 
         .send-button {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-radius: 50%;
-            width: 44px;
-            height: 44px;
+            background-color: transparent;
+            color: #d6fb41;
+            border: 1px solid #d6fb41;
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            transition: background-color 0.2s;
+            font-size: 14px;
+            transition: all 0.2s ease;
             flex-shrink: 0;
+            outline: none !important;
+            box-shadow: none !important;
         }
 
         .send-button:hover {
-            background-color: var(--vscode-button-hoverBackground);
+            background-color: transparent;
+            color: #d6fb41;
+            border: 1px solid #d6fb41;
+            outline: none !important;
+        }
+
+        .send-button:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        .send-button:active {
+            outline: none !important;
+            box-shadow: none !important;
         }
 
         .send-button:disabled {
-            background-color: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
+            background-color: transparent;
+            color: #666666;
+            border: 1px solid #666666;
             cursor: not-allowed;
+            outline: none !important;
+        }
+
+        .send-button:disabled:hover {
+            background-color: transparent;
+            color: #666666;
+            border: 1px solid #666666;
+            outline: none !important;
         }
 
         .welcome-message {
@@ -1027,20 +1238,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         </div>
 
         <div class="input-container">
-            <div class="input-top-row">
-                <span class="mode-label">Mode:</span>
+            <div class="input-wrapper">
                 <div class="mode-dropdown">
                     <select id="modeSelect" class="mode-select">
                         <option value="ask">Ask</option>
                         <option value="learn">Learn</option>
                     </select>
                 </div>
-            </div>
-            <div class="input-row">
                 <textarea 
                     id="messageInput" 
                     class="message-input" 
-                    placeholder="Ask Cipher..."
+                    placeholder="Quick question? Ask here…"
                     rows="1"
                 ></textarea>
                 <button id="sendButton" class="send-button">
@@ -1058,87 +1266,186 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const modeSelect = document.getElementById('modeSelect');
         let typingIndicator = null;
 
-        // Markdown renderer function
+        // Markdown renderer function - GitHub Copilot style
         function renderMarkdown(text) {
-            // Escape HTML entities first
-            let html = text
+            let html = text;
+            
+            // Store code blocks to prevent interference with other processing
+            const codeBlocks = [];
+            let codeBlockIndex = 0;
+            
+            // First, extract and process code blocks (triple backticks)
+            html = html.replace(/\`\`\`(\\w+)?\\n?([\\s\\S]*?)\`\`\`/g, function(match, lang, code) {
+                const language = lang || 'text';
+                const displayLang = lang || 'code';
+                const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+                
+                const cleanCode = code.trim();
+                const placeholder = \`___CODE_BLOCK_\${codeBlockIndex}___\`;
+                
+                codeBlocks[codeBlockIndex] = 
+                    '<div class="code-block-container">' +
+                    '<div class="code-block-header">' + displayLang + '</div>' +
+                    '<pre class="code-block"><code id="' + codeId + '" class="language-' + language + '">' + 
+                    cleanCode.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + 
+                    '</code></pre></div>';
+                
+                codeBlockIndex++;
+                return placeholder;
+            });
+
+            // Now process the rest of the markdown (escaping HTML entities for non-code content)
+            html = html
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#x27;');
 
-            // Code blocks (triple backticks)
-            html = html.replace(/\\\`\\\`\\\`(\\w+)?\\n?([\\s\\S]*?)\\\`\\\`\\\`/g, function(match, lang, code) {
-                const language = lang ? ' data-language="' + lang + '"' : '';
-                const displayLang = lang || 'code';
-                return '<div class="code-block-container"><div class="code-block-header">' + displayLang + '</div><pre class="code-block"' + language + '><code>' + code.trim() + '</code></pre></div>';
-            });
+            // Headers (must be at start of line)
+            html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+            html = html.replace(/^#### (.*$)/gm, '<h4>$1</h4>');
+            html = html.replace(/^##### (.*$)/gm, '<h5>$1</h5>');
+            html = html.replace(/^###### (.*$)/gm, '<h6>$1</h6>');
 
-            // Inline code (backticks)
-            html = html.replace(/\\\`([^\\\`\\n]+)\\\`/g, '<code class="inline-code">$1</code>');
-
-            // Bold text
-            html = html.replace(/\\*\\*([^\\*\\n]+)\\*\\*/g, '<strong>$1</strong>');
+            // Bold text (**text** or __text__)
+            html = html.replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<strong>$1</strong>');
             html = html.replace(/__([^_\\n]+)__/g, '<strong>$1</strong>');
 
-            // Italic text (simple version)
-            html = html.replace(/(?:^|\\s)\\*([^\\*\\n]+)\\*(?=\\s|$)/g, ' <em>$1</em>');
-            html = html.replace(/(?:^|\\s)_([^_\\n]+)_(?=\\s|$)/g, ' <em>$1</em>');
+            // Italic text (*text* or _text_) - but not within words
+            html = html.replace(/(?:^|\\s)\\*([^*\\n]+)\\*(?=\\s|$|[.,!?])/g, function(match, content) {
+                return match.replace('*' + content + '*', '<em>' + content + '</em>');
+            });
 
-            // Headers (must be at start of line)
-            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            // Inline code (backticks) - after we've handled code blocks
+            html = html.replace(/\`([^\`\\n]+)\`/g, '<code class="inline-code">$1</code>');
 
             // Links [text](url)
             html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank">$1</a>');
 
-            // Process lists - handle bullet points
-            html = html.replace(/^[\\*\\-\\+] (.+)$/gm, '<li>$1</li>');
-            
-            // Process numbered lists
-            html = html.replace(/^\\d+\\. (.+)$/gm, '<li class="numbered">$1</li>');
+            // Lists - bullet points
+            const lines = html.split('\\n');
+            const processedLines = [];
+            let inList = false;
+            let listType = null;
 
-            // Wrap consecutive list items in ul/ol tags
-            html = html.replace(/(<li>.*?<\\/li>)(\\s*<li>.*?<\\/li>)*/gs, function(match) {
-                return '<ul>' + match + '</ul>';
-            });
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // Check for bullet list items
+                if (line.match(/^[-*+] (.+)/)) {
+                    const content = line.replace(/^[-*+] /, '');
+                    if (!inList || listType !== 'ul') {
+                        if (inList && listType === 'ol') {
+                            processedLines.push('</ol>');
+                        }
+                        processedLines.push('<ul>');
+                        inList = true;
+                        listType = 'ul';
+                    }
+                    processedLines.push('<li>' + content + '</li>');
+                }
+                // Check for numbered list items
+                else if (line.match(/^\\d+\\. (.+)/)) {
+                    const content = line.replace(/^\\d+\\. /, '');
+                    if (!inList || listType !== 'ol') {
+                        if (inList && listType === 'ul') {
+                            processedLines.push('</ul>');
+                        }
+                        processedLines.push('<ol>');
+                        inList = true;
+                        listType = 'ol';
+                    }
+                    processedLines.push('<li>' + content + '</li>');
+                }
+                else {
+                    // Close any open list
+                    if (inList) {
+                        processedLines.push(listType === 'ul' ? '</ul>' : '</ol>');
+                        inList = false;
+                        listType = null;
+                    }
+                    processedLines.push(line);
+                }
+            }
             
-            html = html.replace(/(<li class="numbered">.*?<\\/li>)(\\s*<li class="numbered">.*?<\\/li>)*/gs, function(match) {
-                const cleanMatch = match.replace(/class="numbered"/g, '');
-                return '<ol>' + cleanMatch + '</ol>';
-            });
-
-            // Convert double newlines to paragraph breaks
-            html = html.replace(/\\n\\n+/g, '</p><p>');
+            // Close any remaining open list
+            if (inList) {
+                processedLines.push(listType === 'ul' ? '</ul>' : '</ol>');
+            }
             
-            // Convert single newlines to line breaks
-            html = html.replace(/\\n/g, '<br>');
+            html = processedLines.join('\\n');
 
-            // Wrap in paragraph if not already wrapped in block elements
-            if (html.indexOf('<h1>') === -1 && html.indexOf('<h2>') === -1 && html.indexOf('<h3>') === -1 && 
-                html.indexOf('<ul>') === -1 && html.indexOf('<ol>') === -1 && html.indexOf('<div class="code-block') === -1 &&
-                html.indexOf('<p>') === -1) {
-                html = '<p>' + html + '</p>';
+            // Handle paragraphs - split by double newlines and wrap in <p> tags
+            const paragraphs = html.split(/\\n\\s*\\n/);
+            const processedParagraphs = [];
+            
+            for (const paragraph of paragraphs) {
+                const trimmed = paragraph.trim();
+                if (trimmed) {
+                    // Don't wrap headers, lists, or code block placeholders in <p> tags
+                    if (trimmed.match(/^<h[1-6]>/) || 
+                        trimmed.match(/^<[uo]l>/) || 
+                        trimmed.match(/___CODE_BLOCK_\\d+___/) ||
+                        trimmed.match(/^<\\/[uo]l>/)) {
+                        processedParagraphs.push(trimmed);
+                    } else {
+                        // Convert single newlines within paragraphs to <br> tags
+                        const withBreaks = trimmed.replace(/\\n/g, '<br>');
+                        processedParagraphs.push('<p>' + withBreaks + '</p>');
+                    }
+                }
+            }
+            
+            html = processedParagraphs.join('\\n\\n');
+
+            // Restore code blocks
+            for (let i = 0; i < codeBlocks.length; i++) {
+                html = html.replace(\`___CODE_BLOCK_\${i}___\`, codeBlocks[i]);
             }
 
-            // Clean up any empty paragraphs
-            html = html.replace(/<p><\\/p>/g, '');
+            // Clean up any extra whitespace and empty elements
+            html = html.replace(/<p>\\s*<\\/p>/g, '');
+            html = html.replace(/\\n{3,}/g, '\\n\\n');
 
             return html;
         }
 
         // Initialize send button state
         sendButton.disabled = true;
+        console.log('Initial button state: disabled');
 
-        // Update placeholder text based on mode
+        // Update placeholder text and input value based on mode
         function updatePlaceholder() {
             const mode = modeSelect.value;
+            console.log('Updating placeholder for mode:', mode);
             if (mode === 'learn') {
-                messageInput.placeholder = 'What would you like to learn about?';
+                messageInput.placeholder = 'Learn about algorithms and data structures';
+                // Pre-fill the input with learn mode text
+                messageInput.value = 'Help me learn this question';
+                // Enable send button since there's content
+                sendButton.disabled = false;
+                console.log('Learn mode: button enabled');
+                // Set appropriate height for pre-filled content
+                messageInput.style.height = '18px';
+                messageInput.style.overflowY = 'hidden';
+                // Check if content needs more height
+                if (messageInput.scrollHeight > 20) {
+                    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+                    messageInput.style.overflowY = messageInput.scrollHeight > 120 ? 'auto' : 'hidden';
+                }
             } else {
-                messageInput.placeholder = 'Ask Cipher...';
+                messageInput.placeholder = 'Quick question? Ask here…';
+                // Clear input when switching to ask mode
+                messageInput.value = '';
+                // Disable send button since input is empty
+                sendButton.disabled = true;
+                console.log('Ask mode: button disabled');
+                // Reset textarea to minimum height
+                messageInput.style.height = '18px';
+                messageInput.style.overflowY = 'hidden';
             }
         }
 
@@ -1152,36 +1459,61 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         // Auto-resize textarea and handle button state
         messageInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            // Reset to minimum height first to get accurate scrollHeight
+            this.style.height = '18px';
+            
+            // Calculate if content needs more height
+            const currentScrollHeight = this.scrollHeight;
+            
+            // If content requires more space than current height, expand
+            if (currentScrollHeight > 18) {
+                this.style.height = Math.min(currentScrollHeight, 120) + 'px';
+            }
+            
+            // Handle overflow when max height is reached
+            this.style.overflowY = currentScrollHeight > 120 ? 'auto' : 'hidden';
             
             // Enable/disable send button based on content
             const hasContent = this.value.trim().length > 0;
             sendButton.disabled = !hasContent;
+            console.log('Input changed. Has content:', hasContent, 'Button disabled:', sendButton.disabled);
         });
 
         // Send message on Enter (but allow Shift+Enter for new lines)
         messageInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                e.stopPropagation();
+                if (!sendButton.disabled) {
+                    sendMessage();
+                }
+                return false;
             }
         });
 
         // Add click event listener to send button
-        sendButton.addEventListener('click', function() {
-            sendMessage();
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!sendButton.disabled) {
+                sendMessage();
+            }
         });
 
         function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message) return;
+            if (!message) {
+                console.log('No message to send');
+                return;
+            }
             
             const selectedMode = modeSelect.value;
+            console.log('Sending message:', message, 'Mode:', selectedMode);
             
             // Clear input and reset button state
             messageInput.value = '';
-            messageInput.style.height = 'auto';
+            messageInput.style.height = '18px';
+            messageInput.style.overflowY = 'hidden';
             sendButton.disabled = true;
 
             // Send to extension with mode included
@@ -1210,6 +1542,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 bubble.textContent = message.text;
             } else {
                 bubble.innerHTML = renderMarkdown(message.text);
+                
+                // Apply syntax highlighting to code blocks
+                setTimeout(() => {
+                    const codeBlocks = bubble.querySelectorAll('pre code');
+                    codeBlocks.forEach((block) => {
+                        // Apply highlighting if hljs is available
+                        if (typeof hljs !== 'undefined') {
+                            hljs.highlightElement(block);
+                        }
+                    });
+                }, 10);
             }
             
             messageDiv.appendChild(bubble);
