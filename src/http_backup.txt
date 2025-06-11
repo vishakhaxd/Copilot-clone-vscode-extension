@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
-import * as WebSocket from 'ws';
+import * as https from 'https';
+import * as http from 'http';
 
 interface ChatMessage {
     text: string;
     isUser: boolean;
     timestamp: string;
     id: string;
-    isBackendInitiated?: boolean; // For backend-initiated messages
 }
 
 interface VSCodeContext {
@@ -84,18 +84,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _messages: ChatMessage[] = [];
     private _currentModeResolver?: (mode: string) => void;
-    
-    // WebSocket properties
-    private _webSocket?: WebSocket;
-    private _isConnected = false;
-    private _clientId: string;
-    private _reconnectTimeout?: NodeJS.Timeout;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {
-        this._clientId = `vscode_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        // Initialize WebSocket when extension loads
-        this.initializeWebSocket();
-    }
+    constructor(private readonly _extensionUri: vscode.Uri) {}
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -211,48 +201,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         });
 
         try {
-            // Gather context first
-            const context = await this.gatherVSCodeContext();
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            let question: string | undefined;
-            let path: string | undefined;
-            
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                path = workspaceFolders[0].uri.fsPath;
-                question = workspaceFolders[0].name;
-            }
+            // Generate AI response
+            const aiResponse = await this.generateAIResponse(message, mode);
+            const aiMessage: ChatMessage = {
+                text: aiResponse,
+                isUser: false,
+                timestamp: new Date().toISOString(),
+                id: this.generateId()
+            };
 
-            // Send via WebSocket only
-            const sent = this.sendWebSocketMessage({
-                type: 'chat_message',
-                message: message,
-                mode: mode,
-                context: context,
-                clientId: this._clientId,
-                question: question,
-                path: path
+            this._messages.push(aiMessage);
+
+            // Hide typing indicator and add AI message
+            this._view?.webview.postMessage({
+                type: 'hideTyping'
             });
 
-            if (!sent) {
-                // No fallback - show error if WebSocket is not available
-                this._view?.webview.postMessage({
-                    type: 'hideTyping'
-                });
-
-                const errorMessage: ChatMessage = {
-                    text: "I am currently unable to process your request. Please refresh the chat or try again.",
-                    isUser: false,
-                    timestamp: new Date().toISOString(),
-                    id: this.generateId()
-                };
-
-                this._view?.webview.postMessage({
-                    type: 'addMessage',
-                    message: errorMessage
-                });
-                return;
-            }
-            // Response will come via WebSocket onmessage handler
+            this._view?.webview.postMessage({
+                type: 'addMessage',
+                message: aiMessage
+            });
 
         } catch (error) {
             console.error('Error generating AI response:', error);
@@ -509,6 +477,95 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         return context;
+    }
+
+    private async generateAIResponse(userMessage: string, mode: string = 'ask'): Promise<string> {
+        // Gather context before generating response
+        const context = await this.gatherVSCodeContext();
+        
+        // Get workspace information separately
+        let question: string | undefined;
+        let path: string | undefined;
+        
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            path = workspaceFolders[0].uri.fsPath;
+            question = workspaceFolders[0].name;
+        }
+        
+        // Get response from local API
+        const response = await this.getContextualResponses(userMessage, context, mode, question, path);
+        
+        return response;
+    }
+
+    private async getContextualResponses(message: string, context?: VSCodeContext, mode: string = 'ask', question?: string, path?: string): Promise<string> {
+        try {
+            const requestBody = JSON.stringify({
+                message: message,
+                mode: mode,
+                question: question,
+                path: path,
+                context: context
+            });
+
+            return new Promise((resolve, reject) => {
+                const options = {
+                    hostname: '127.0.0.1', // Using explicit IP instead of localhost
+                    port: 7777,
+                    path: '/cypher-agent',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(requestBody)
+                    }
+                };
+
+                const req = http.request(options, (res) => {
+                    let data = '';
+
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+
+                    res.on('end', () => {
+                        // Check if the response status is not successful
+                        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+                            resolve(`API Error: Received status code ${res.statusCode}. Please check if your API server is running and the endpoint is correct.`);
+                            return;
+                        }
+
+                        try {
+                            const response = JSON.parse(data);
+                            // Assuming the API returns an object with a 'response' field containing the text
+                            // Adjust this based on your actual API response format
+                            const result = response.response || response.message || response.text || response.content || "I received a response from the API, but couldn't parse it properly.";
+                            resolve(result);
+                        } catch (parseError) {
+                            resolve(`API returned non-JSON response: ${data.substring(0, 200)}${data.length > 200 ? '...' : ''}`);
+                        }
+                    });
+                });
+
+                req.on('error', (error) => {
+                    resolve("I'm sorry, I'm having trouble connecting to my processing service right now. Please try again in a moment.");
+                });
+
+                req.on('timeout', () => {
+                    resolve("The request timed out. Please try again.");
+                });
+
+                // Set a timeout
+                req.setTimeout(30000); // 30 seconds timeout
+
+                req.write(requestBody);
+                req.end();
+            });
+            
+        } catch (error) {
+            // Fallback response in case of API failure
+            return "I'm sorry, I'm having trouble connecting to my processing service right now. Please try again in a moment.";
+        }
     }
 
     private restoreMessages() {
@@ -1626,158 +1683,69 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 </html>`;
     }
 
-    // WebSocket Implementation
-    private initializeWebSocket() {
-        try {
-            console.log('🔄 Initializing WebSocket connection...');
-            this._webSocket = new WebSocket('ws://127.0.0.1:7778');
-            
-            this._webSocket.on('open', () => {
-                console.log('✅ WebSocket connected');
-                this._isConnected = true;
-                
-                // Tell backend this client is ready
-                this.sendWebSocketMessage({
-                    type: 'client_register',
-                    clientId: this._clientId,
-                    workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-                });
-            });
-
-            this._webSocket.on('message', (data: WebSocket.Data) => {
-                try {
-                    const message = JSON.parse(data.toString());
-                    this.handleBackendMessage(message);
-                } catch (error) {
-                    console.error('Failed to parse WebSocket message:', error);
-                }
-            });
-
-            this._webSocket.on('close', () => {
-                console.log('🔌 WebSocket disconnected');
-                this._isConnected = false;
-                
-                // Since backend is always running, try to reconnect once
-                if (this._reconnectTimeout) {
-                    clearTimeout(this._reconnectTimeout);
-                }
-                
-                this._reconnectTimeout = setTimeout(() => {
-                    console.log('🔄 Attempting to reconnect...');
-                    this.initializeWebSocket();
-                }, 2000); // 2 second delay for local connections
-            });
-
-            this._webSocket.on('error', (error) => {
-                console.log('❌ WebSocket error:', error.message);
-                this._isConnected = false;
-            });
-
-        } catch (error) {
-            console.log('❌ WebSocket initialization failed:', error);
-            this._isConnected = false;
-        }
-    }
-
-    private handleBackendMessage(data: any) {
-        console.log('📨 Received backend message:', data.type);
-        
-        switch (data.type) {
-            case 'backend_message':
-                this.addBackendInitiatedMessage(data.message, data.messageType || 'notification');
-                break;
-            case 'chat_message':
-                this.addAIResponse(data.message);
-                break;
-            case 'ping':
-                // Respond to backend ping
-                this.sendWebSocketMessage({ type: 'pong', clientId: this._clientId });
-                break;
-            default:
-                console.log('Unknown message type:', data.type);
-        }
-    }
-
-    private addBackendInitiatedMessage(message: string, messageType: string) {
-        const backendMessage: ChatMessage = {
-            text: message,
-            isUser: false,
-            timestamp: new Date().toISOString(),
-            id: this.generateId(),
-            isBackendInitiated: true
-        };
-
-        this._messages.push(backendMessage);
-        
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'addMessage',
-                message: backendMessage
-            });
-        }
-    }
-
-    private addAIResponse(response: string) {
-        const aiMessage: ChatMessage = {
-            text: response,
-            isUser: false,
-            timestamp: new Date().toISOString(),
-            id: this.generateId()
-        };
-
-        this._messages.push(aiMessage);
-        
-        if (this._view) {
-            this._view.webview.postMessage({ type: 'hideTyping' });
-            this._view.webview.postMessage({
-                type: 'addMessage',
-                message: aiMessage
-            });
-        }
-    }
-
-    private sendWebSocketMessage(data: any): boolean {
-        if (this._isConnected && this._webSocket?.readyState === WebSocket.OPEN) {
-            try {
-                this._webSocket.send(JSON.stringify(data));
-                return true;
-            } catch (error) {
-                console.error('Failed to send WebSocket message:', error);
-                return false;
-            }
-        }
-        return false;
-    }
-
-    // Cleanup WebSocket on disposal
-    public dispose() {
-        if (this._reconnectTimeout) {
-            clearTimeout(this._reconnectTimeout);
-        }
-        if (this._webSocket) {
-            this._webSocket.close();
-        }
-    }
-
     private async clearCheckpoints(question?: string, path?: string, mode: string = 'clear'): Promise<void> {
         try {
-            // Send clear chat request via WebSocket
-            const sent = this.sendWebSocketMessage({
-                type: 'clear_chat',
+            const requestBody = JSON.stringify({
                 question: question,
                 path: path,
-                mode: mode,
-                clientId: this._clientId
+                mode: mode // Use the provided mode parameter
             });
 
-            if (!sent) {
-                console.log('Failed to send clear chat request via WebSocket - not connected');
-            } else {
-                console.log('Clear chat request sent via WebSocket');
-            }
-            
+            const options = {
+                hostname: '127.0.0.1', // Using same IP as main API
+                port: 7777, // Using same port as main API
+                path: '/cypher-agent/clear_checkpoints',
+                method: 'POST', // Change to POST to send JSON body
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(requestBody)
+                },
+                timeout: 30000 // 30 seconds timeout
+            };
+
+            return new Promise((resolve) => {
+                const req = http.request(options, (res) => {
+                    let data = '';
+                    
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+                    
+                    res.on('end', () => {
+                        // Check if the response status is not successful
+                        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+                            resolve(); // Don't fail the chat clear operation
+                            return;
+                        }
+
+                        try {
+                            const response = JSON.parse(data);
+                            if (response.error) {
+                                resolve(); // Don't fail the chat clear operation
+                            } else {
+                                resolve();
+                            }
+                        } catch (parseError) {
+                            resolve(); // Don't fail the chat clear operation
+                        }
+                    });
+                });
+                
+                req.on('error', () => {
+                    resolve(); // Don't fail the chat clear operation
+                });
+
+                req.on('timeout', () => {
+                    req.destroy();
+                    resolve(); // Don't fail the chat clear operation
+                });
+                
+                req.setTimeout(30000); // 30 seconds timeout
+                req.write(requestBody);
+                req.end();
+            });
         } catch (error) {
-            console.error('Error sending clear chat request:', error);
+            // Don't throw error - we don't want to fail chat clearing if API is down
         }
     }
 
