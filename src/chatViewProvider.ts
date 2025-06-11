@@ -1637,10 +1637,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 this._isConnected = true;
                 
                 // Tell backend this client is ready
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                const question = workspaceFolder?.name || 'Unknown';
+                
                 this.sendWebSocketMessage({
                     type: 'client_register',
                     clientId: this._clientId,
-                    workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+                    question: question
                 });
             });
 

@@ -24,7 +24,7 @@ class SimpleServer:
             async for message in websocket:
                 try:
                     data = json.loads(message)
-                    logger.info(f"Received: {data.get('type')}")
+                    logger.info(f"Received: {data}")
                     
                     # Route message based on type parameter
                     message_type = data.get('type')
