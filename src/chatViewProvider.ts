@@ -13,7 +13,6 @@ interface VSCodeContext {
     activeFile?: {
         path: string;
         language: string;
-        content: string;
         cursorPosition?: {
             line: number;
             character: number;
@@ -24,11 +23,6 @@ interface VSCodeContext {
             text: string;
         };
         totalLines?: number;
-    };
-    workspace?: {
-        rootPath?: string;
-        name?: string;
-        folders?: string[];
     };
     git?: {
         branch?: string;
@@ -89,6 +83,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'dsp-cipher.chat';
     private _view?: vscode.WebviewView;
     private _messages: ChatMessage[] = [];
+    private _currentModeResolver?: (mode: string) => void;
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -112,6 +107,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             async (data) => {
                 if (data.type === 'sendMessage') {
                     await this.handleUserMessage(data.message, data.mode);
+                } else if (data.type === 'currentModeResponse') {
+                    // Handle the current mode response for clear chat functionality
+                    this._currentModeResolver?.(data.mode);
+                    this._currentModeResolver = undefined;
                 }
             }
         );
@@ -120,11 +119,62 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.restoreMessages();
     }
 
-    public clearChat() {
+    private async getCurrentModeFromWebview(): Promise<string> {
+        return new Promise((resolve, reject) => {
+            if (!this._view) {
+                reject(new Error('Webview not available'));
+                return;
+            }
+
+            // Store the resolver for when the webview responds
+            this._currentModeResolver = resolve;
+
+            // Request current mode from webview
+            this._view.webview.postMessage({
+                type: 'requestCurrentMode'
+            });
+
+            // Set timeout to avoid hanging
+            setTimeout(() => {
+                if (this._currentModeResolver) {
+                    this._currentModeResolver = undefined;
+                    reject(new Error('Timeout waiting for mode response'));
+                }
+            }, 1000);
+        });
+    }
+
+    public async clearChat() {
+        // Clear local messages first
         this._messages = [];
+        
+        // Clear the chat UI
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'clearChat'
+            });
+        }
+        
+        // Get workspace information for the API call
+        let question: string | undefined;
+        let path: string | undefined;
+        
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            path = workspaceFolders[0].uri.fsPath;
+            question = workspaceFolders[0].name;
+        }
+        
+        // Get current mode from webview and clear checkpoints with actual mode
+        try {
+            const currentMode = await this.getCurrentModeFromWebview();
+            this.clearCheckpoints(question, path, currentMode).catch(() => {
+                // Silently handle errors - chat was cleared locally
+            });
+        } catch (error) {
+            // If we can't get the mode, fallback to 'ask' mode
+            this.clearCheckpoints(question, path, 'ask').catch(() => {
+                // Silently handle errors - chat was cleared locally
             });
         }
     }
@@ -211,25 +261,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 context.activeFile = {
                     path: document.uri.fsPath,
                     language: document.languageId,
-                    content: '',
                     totalLines: document.lineCount,
                     cursorPosition: {
                         line: position.line,
                         character: position.character
                     }
                 };
-
-                // Get content around cursor (±10 lines)
-                const startLine = Math.max(0, position.line - 10);
-                const endLine = Math.min(document.lineCount - 1, position.line + 10);
-                
-                let contextContent = '';
-                for (let i = startLine; i <= endLine; i++) {
-                    const lineText = document.lineAt(i).text;
-                    const linePrefix = i === position.line ? '>>> ' : '    ';
-                    contextContent += `${linePrefix}${i + 1}: ${lineText}\n`;
-                }
-                context.activeFile.content = contextContent;
 
                 // Get selection if any
                 if (!activeEditor.selection.isEmpty) {
@@ -242,15 +279,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 }
             }
 
-            // 2. Get workspace information
+            // 2. Get workspace information for Git operations
             const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                context.workspace = {
-                    rootPath: workspaceFolders[0].uri.fsPath,
-                    name: workspaceFolders[0].name,
-                    folders: workspaceFolders.map(folder => folder.uri.fsPath)
-                };
-            }
 
             // 3. Get comprehensive Git information
             try {
@@ -453,17 +483,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Gather context before generating response
         const context = await this.gatherVSCodeContext();
         
+        // Get workspace information separately
+        let question: string | undefined;
+        let path: string | undefined;
+        
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            path = workspaceFolders[0].uri.fsPath;
+            question = workspaceFolders[0].name;
+        }
+        
         // Get response from local API
-        const response = await this.getContextualResponses(userMessage, context, mode);
+        const response = await this.getContextualResponses(userMessage, context, mode, question, path);
         
         return response;
     }
 
-    private async getContextualResponses(message: string, context?: VSCodeContext, mode: string = 'ask'): Promise<string> {
+    private async getContextualResponses(message: string, context?: VSCodeContext, mode: string = 'ask', question?: string, path?: string): Promise<string> {
         try {
             const requestBody = JSON.stringify({
                 message: message,
                 mode: mode,
+                question: question,
+                path: path,
                 context: context
             });
 
@@ -1627,11 +1669,84 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 '</div>' +
             '</div>';
                     break;
+                case 'requestCurrentMode':
+                    // Respond with current mode for clear chat functionality
+                    vscode.postMessage({
+                        type: 'currentModeResponse',
+                        mode: modeSelect.value
+                    });
+                    break;
             }
         });
     </script>
 </body>
 </html>`;
+    }
+
+    private async clearCheckpoints(question?: string, path?: string, mode: string = 'clear'): Promise<void> {
+        try {
+            const requestBody = JSON.stringify({
+                question: question,
+                path: path,
+                mode: mode // Use the provided mode parameter
+            });
+
+            const options = {
+                hostname: '127.0.0.1', // Using same IP as main API
+                port: 7777, // Using same port as main API
+                path: '/cypher-agent/clear_checkpoints',
+                method: 'POST', // Change to POST to send JSON body
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(requestBody)
+                },
+                timeout: 30000 // 30 seconds timeout
+            };
+
+            return new Promise((resolve) => {
+                const req = http.request(options, (res) => {
+                    let data = '';
+                    
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+                    
+                    res.on('end', () => {
+                        // Check if the response status is not successful
+                        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+                            resolve(); // Don't fail the chat clear operation
+                            return;
+                        }
+
+                        try {
+                            const response = JSON.parse(data);
+                            if (response.error) {
+                                resolve(); // Don't fail the chat clear operation
+                            } else {
+                                resolve();
+                            }
+                        } catch (parseError) {
+                            resolve(); // Don't fail the chat clear operation
+                        }
+                    });
+                });
+                
+                req.on('error', () => {
+                    resolve(); // Don't fail the chat clear operation
+                });
+
+                req.on('timeout', () => {
+                    req.destroy();
+                    resolve(); // Don't fail the chat clear operation
+                });
+                
+                req.setTimeout(30000); // 30 seconds timeout
+                req.write(requestBody);
+                req.end();
+            });
+        } catch (error) {
+            // Don't throw error - we don't want to fail chat clearing if API is down
+        }
     }
 
     private getGitStatusString(status: number): string {
