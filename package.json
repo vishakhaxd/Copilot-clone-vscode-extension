@@ -1,7 +1,7 @@
 {
-  "name": "dsp-cipher",
-  "displayName": "DSP Cipher",
-  "description": "AI coding assistant for algorithmic problem solving - Your intelligent companion for LeetCode and competitive programming",
+  "name": "Cipher",
+  "displayName": "Cipher",
+  "description": "AI coding assistant of dspcoder.com",
   "version": "0.0.1",
   "publisher": "dspcoder",
   "repository": {
@@ -13,8 +13,6 @@
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Other",
-    "Machine Learning",
     "Education"
   ],
   "keywords": [
@@ -48,8 +46,7 @@
           "type": "webview",
           "id": "dsp-cipher.chat",
           "name": "Cipher",
-          "icon": "$(comment-discussion)",
-          "when": "dsp-cipher.chatEnabled"
+          "icon": "$(comment-discussion)"
         }
       ]
     },

@@ -1217,7 +1217,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 <div class="welcome-logo">{  }</div>
                 <div class="welcome-title">Ask Cipher</div>
                 <div class="welcome-subtitle">
-                    Your AI assistant for algorithms, data structures, and coding challenges.
+                    I can help you with your code, algorithms, programming concepts, and more..
                 </div>
             </div>
         </div>
@@ -1608,7 +1608,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 '<div class="welcome-logo">{  }</div>' +
                 '<div class="welcome-title">Ask Cipher</div>' +
                 '<div class="welcome-subtitle">' +
-                    'Your AI assistant for algorithms, data structures, and coding challenges.' +
+                    'I can help you with your code, algorithms, programming concepts, and more..' +
                 '</div>' +
             '</div>';
                     break;
