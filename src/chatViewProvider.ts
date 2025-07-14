@@ -91,7 +91,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private _clientId: string;
     private _reconnectTimeout?: NodeJS.Timeout;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        private readonly _activityProvider?: any // ActivityViewProvider
+    ) {
         this._clientId = `vscode_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         // Initialize WebSocket when extension loads
         this.initializeWebSocket();
@@ -1691,6 +1694,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 break;
             case 'chat_message':
                 this.addAIResponse(data.message);
+                break;
+            case 'submission_response':
+                // Handle submission results
+                if (this._activityProvider && data.response) {
+                    this._activityProvider.addActivity('submission', data.response, data.problemName);
+                    vscode.window.showInformationMessage(
+                        `Submission completed: ${data.response.output?.metadata?.overall_status || 'Unknown'}`,
+                        'View Results'
+                    ).then(selection => {
+                        if (selection === 'View Results') {
+                            vscode.commands.executeCommand('dsp-cipher.activity.focus');
+                        }
+                    });
+                }
+                break;
+            case 'run_response':
+                // Handle run results
+                if (this._activityProvider && data.response) {
+                    this._activityProvider.addActivity('run', data.response, data.problemName);
+                    vscode.window.showInformationMessage(
+                        `Run completed: ${data.response.output?.metadata?.overall_status || 'Unknown'}`,
+                        'View Results'
+                    ).then(selection => {
+                        if (selection === 'View Results') {
+                            vscode.commands.executeCommand('dsp-cipher.activity.focus');
+                        }
+                    });
+                }
                 break;
             case 'ping':
                 // Respond to backend ping

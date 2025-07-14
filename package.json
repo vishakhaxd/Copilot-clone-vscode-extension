@@ -51,6 +51,16 @@
         "command": "dsp-cipher.openProblemDescription",
         "title": "Open Problem Description",
         "icon": "$(markdown)"
+      },
+      {
+        "command": "dsp-cipher.openActivity",
+        "title": "Open Activity Manager",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "dsp-cipher.addTestActivity",
+        "title": "Add Test Activity (Demo)",
+        "icon": "$(beaker)"
       }
     ],
     "views": {
@@ -58,13 +68,19 @@
         {
           "type": "webview",
           "id": "dsp-cipher.chat",
-          "name": "Cipher",
+          "name": "Cipher Chat",
           "icon": "$(comment-discussion)"
+        },
+        {
+          "type": "webview",
+          "id": "dsp-cipher.activity",
+          "name": "Activity Manager",
+          "icon": "$(pulse)"
         }
       ]
     },
     "viewsContainers": {
-      "secondarybar": [
+      "activitybar": [
         {
           "id": "dsp-cipher",
           "title": "Cipher",
