@@ -608,7 +608,7 @@ export class ActivityViewProvider implements vscode.WebviewViewProvider {
         <div class="empty-state">
             <div class="icon">📊</div>
             <h3>No Activities Yet</h3>
-            <p>Submit or run your code to see results here</p>
+            <p>Submit your code to see results here</p>
         </div>
     </div>
 
@@ -651,7 +651,7 @@ export class ActivityViewProvider implements vscode.WebviewViewProvider {
                     <div class="empty-state">
                         <div class="icon">📊</div>
                         <h3>No Activities Yet</h3>
-                        <p>Submit or run your code to see results here</p>
+                        <p>Submit your code to see results here</p>
                     </div>
                 \`;
                 return;

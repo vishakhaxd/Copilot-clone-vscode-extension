@@ -64,17 +64,19 @@
       }
     ],
     "views": {
-      "dsp-cipher": [
+      "dsp-cipher-chat": [
         {
           "type": "webview",
           "id": "dsp-cipher.chat",
-          "name": "Cipher Chat",
+          "name": "Chat",
           "icon": "$(comment-discussion)"
-        },
+        }
+      ],
+      "dsp-cipher-submission": [
         {
           "type": "webview",
           "id": "dsp-cipher.activity",
-          "name": "Activity Manager",
+          "name": "Activity",
           "icon": "$(pulse)"
         }
       ]
@@ -82,9 +84,14 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "dsp-cipher",
-          "title": "Cipher",
-          "icon": "$(robot)"
+          "id": "dsp-cipher-chat",
+          "title": "CHAT",
+          "icon": "$(comment-discussion)"
+        },
+        {
+          "id": "dsp-cipher-submission",
+          "title": "SUBMISSION",
+          "icon": "$(pulse)"
         }
       ]
     },
