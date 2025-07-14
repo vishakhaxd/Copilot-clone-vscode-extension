@@ -1,5 +1,5 @@
 {
-  "name": "Cipher",
+  "name": "cipher",
   "displayName": "Cipher",
   "description": "AI coding assistant of dspcoder.com",
   "version": "0.0.1",
@@ -40,12 +40,18 @@
         "icon": "$(clear-all)"
       },
       {
+<<<<<<< HEAD
         "command": "dsp-cipher.run",
         "title": "Run Code"
       },
       {
         "command": "dsp-cipher.submit",
         "title": "Submit Code"
+=======
+        "command": "dsp-cipher.openProblemDescription",
+        "title": "Open Problem Description",
+        "icon": "$(markdown)"
+>>>>>>> 81c5fed (problem description panel added)
       }
     ],
     "views": {
