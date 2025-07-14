@@ -82,7 +82,8 @@ interface VSCodeContext {
 export class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'dsp-cipher.chat';
     private _view?: vscode.WebviewView;
-    private _messages: ChatMessage[] = [];
+    private static _messages: ChatMessage[] = []; // Make it static to persist across instances
+    private static _instances: ChatViewProvider[] = []; // Track all instances
     private _currentModeResolver?: (mode: string) => void;
     
     // WebSocket properties
@@ -95,6 +96,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         private readonly _extensionUri: vscode.Uri,
         private readonly _activityProvider?: any // ActivityViewProvider
     ) {
+        // Add this instance to the static list
+        ChatViewProvider._instances.push(this);
         this._clientId = `vscode_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         // Initialize WebSocket when extension loads
         this.initializeWebSocket();
@@ -124,12 +127,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     // Handle the current mode response for clear chat functionality
                     this._currentModeResolver?.(data.mode);
                     this._currentModeResolver = undefined;
+                } else if (data.type === 'requestMessages') {
+                    // Send current messages when requested
+                    this.restoreMessages();
                 }
             }
         );
 
+        // Clean up when webview is disposed
+        webviewView.onDidDispose(() => {
+            const index = ChatViewProvider._instances.indexOf(this);
+            if (index > -1) {
+                ChatViewProvider._instances.splice(index, 1);
+            }
+        });
+
         // Restore previous messages if any
-        this.restoreMessages();
+        setTimeout(() => {
+            this.restoreMessages();
+        }, 100);
+    }
+
+    private static _updateAllViews(type: string, data: any) {
+        // Update all active instances
+        ChatViewProvider._instances.forEach(instance => {
+            if (instance._view) {
+                instance._view.webview.postMessage({
+                    type: type,
+                    ...data
+                });
+            }
+        });
     }
 
     private async getCurrentModeFromWebview(): Promise<string> {
@@ -158,15 +186,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     public async clearChat() {
-        // Clear local messages first
-        this._messages = [];
+        // Clear static messages first
+        ChatViewProvider._messages = [];
         
-        // Clear the chat UI
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'clearChat'
-            });
-        }
+        // Clear the chat UI for all instances
+        ChatViewProvider._updateAllViews('clearChat', {});
         
         // Get workspace information for the API call
         let question: string | undefined;
@@ -200,18 +224,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             id: this.generateId()
         };
 
-        this._messages.push(userMessage);
+        ChatViewProvider._messages.push(userMessage);
 
-        // Add user message to chat
-        this._view?.webview.postMessage({
-            type: 'addMessage',
-            message: userMessage
-        });
+        // Add user message to chat - update all instances
+        ChatViewProvider._updateAllViews('addMessage', { message: userMessage });
 
         // Show typing indicator
-        this._view?.webview.postMessage({
-            type: 'showTyping'
-        });
+        ChatViewProvider._updateAllViews('showTyping', {});
 
         try {
             // Gather context first
@@ -238,9 +257,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
             if (!sent) {
                 // No fallback - show error if WebSocket is not available
-                this._view?.webview.postMessage({
-                    type: 'hideTyping'
-                });
+                ChatViewProvider._updateAllViews('hideTyping', {});
 
                 const errorMessage: ChatMessage = {
                     text: "I am currently unable to process your request. Please refresh the chat or try again.",
@@ -249,10 +266,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     id: this.generateId()
                 };
 
-                this._view?.webview.postMessage({
-                    type: 'addMessage',
-                    message: errorMessage
-                });
+                ChatViewProvider._messages.push(errorMessage);
+                ChatViewProvider._updateAllViews('addMessage', { message: errorMessage });
                 return;
             }
             // Response will come via WebSocket onmessage handler
@@ -260,9 +275,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         } catch (error) {
             console.error('Error generating AI response:', error);
             
-            this._view?.webview.postMessage({
-                type: 'hideTyping'
-            });
+            ChatViewProvider._updateAllViews('hideTyping', {});
 
             const errorMessage: ChatMessage = {
                 text: "Sorry, I encountered an error while processing your request. Please try again.",
@@ -271,10 +284,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 id: this.generateId()
             };
 
-            this._view?.webview.postMessage({
-                type: 'addMessage',
-                message: errorMessage
-            });
+            ChatViewProvider._messages.push(errorMessage);
+            ChatViewProvider._updateAllViews('addMessage', { message: errorMessage });
         }
     }
 
@@ -516,7 +527,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private restoreMessages() {
         // Send all previous messages to the webview
-        this._messages.forEach(message => {
+        ChatViewProvider._messages.forEach((message: ChatMessage) => {
             this._view?.webview.postMessage({
                 type: 'addMessage',
                 message: message
@@ -1624,6 +1635,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     break;
             }
         });
+
+        // Request initial messages when webview loads
+        vscode.postMessage({
+            type: 'requestMessages'
+        });
     </script>
 </body>
 </html>`;
@@ -1699,28 +1715,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 // Handle submission results
                 if (this._activityProvider && data.response) {
                     this._activityProvider.addActivity('submission', data.response, data.problemName);
-                    vscode.window.showInformationMessage(
-                        `Submission completed: ${data.response.output?.metadata?.overall_status || 'Unknown'}`,
-                        'View Results'
-                    ).then(selection => {
-                        if (selection === 'View Results') {
-                            vscode.commands.executeCommand('dsp-cipher.activity.focus');
-                        }
-                    });
+                    
+                    const status = data.response.output?.metadata?.overall_status || 'Unknown';
+                    
+                    // Show auto-dismissing status bar message only
+                    const statusMessage = vscode.window.setStatusBarMessage(
+                        `$(check) Submission completed: ${status}`,
+                        5000 // Auto-dismiss after 5 seconds
+                    );
                 }
                 break;
             case 'run_response':
                 // Handle run results
                 if (this._activityProvider && data.response) {
                     this._activityProvider.addActivity('run', data.response, data.problemName);
-                    vscode.window.showInformationMessage(
-                        `Run completed: ${data.response.output?.metadata?.overall_status || 'Unknown'}`,
-                        'View Results'
-                    ).then(selection => {
-                        if (selection === 'View Results') {
-                            vscode.commands.executeCommand('dsp-cipher.activity.focus');
-                        }
-                    });
+                    
+                    const status = data.response.output?.metadata?.overall_status || 'Unknown';
+                    
+                    // Show auto-dismissing status bar message only
+                    const statusMessage = vscode.window.setStatusBarMessage(
+                        `$(play) Run completed: ${status}`,
+                        5000 // Auto-dismiss after 5 seconds
+                    );
                 }
                 break;
             case 'ping':
@@ -1741,14 +1757,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             isBackendInitiated: true
         };
 
-        this._messages.push(backendMessage);
+        ChatViewProvider._messages.push(backendMessage);
         
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'addMessage',
-                message: backendMessage
-            });
-        }
+        // Update all instances
+        ChatViewProvider._updateAllViews('addMessage', { message: backendMessage });
     }
 
     private addAIResponse(response: string) {
@@ -1759,15 +1771,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             id: this.generateId()
         };
 
-        this._messages.push(aiMessage);
+        ChatViewProvider._messages.push(aiMessage);
         
-        if (this._view) {
-            this._view.webview.postMessage({ type: 'hideTyping' });
-            this._view.webview.postMessage({
-                type: 'addMessage',
-                message: aiMessage
-            });
-        }
+        // Update all instances
+        ChatViewProvider._updateAllViews('hideTyping', {});
+        ChatViewProvider._updateAllViews('addMessage', { message: aiMessage });
     }
 
     // Public method to send WebSocket messages from extension commands

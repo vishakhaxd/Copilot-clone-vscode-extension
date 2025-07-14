@@ -82,7 +82,7 @@
       ]
     },
     "viewsContainers": {
-      "activitybar": [
+      "secondarybar": [
         {
           "id": "dsp-cipher-chat",
           "title": "CHAT",
