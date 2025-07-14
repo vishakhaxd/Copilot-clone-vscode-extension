@@ -57,9 +57,13 @@ interface ActivityData {
 export class ActivityViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'dsp-cipher.activity';
     private _view?: vscode.WebviewView;
-    private _activities: ActivityData[] = [];
+    private static _activities: ActivityData[] = []; // Make it static to persist across instances
+    private static _instances: ActivityViewProvider[] = []; // Track all instances
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+    constructor(private readonly _extensionUri: vscode.Uri) {
+        // Add this instance to the static list
+        ActivityViewProvider._instances.push(this);
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -76,8 +80,26 @@ export class ActivityViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
         webviewView.webview.onDidReceiveMessage(data => {
-            // Remove message handling since we don't need clear or export functionality
+            switch (data.type) {
+                case 'requestActivities':
+                    // Send current activities when requested
+                    this._updateView();
+                    break;
+            }
         });
+
+        // Clean up when webview is disposed
+        webviewView.onDidDispose(() => {
+            const index = ActivityViewProvider._instances.indexOf(this);
+            if (index > -1) {
+                ActivityViewProvider._instances.splice(index, 1);
+            }
+        });
+
+        // Load existing activities when view is resolved - use setTimeout to ensure webview is fully loaded
+        setTimeout(() => {
+            this._updateView();
+        }, 100);
     }
 
     public addActivity(type: 'submission' | 'run', response: SubmissionResponse, problemName?: string) {
@@ -88,21 +110,34 @@ export class ActivityViewProvider implements vscode.WebviewViewProvider {
             problemName
         };
         
-        this._activities.unshift(activity); // Add to beginning
+        ActivityViewProvider._activities.unshift(activity); // Add to beginning
         
         // Keep only last 50 activities
-        if (this._activities.length > 50) {
-            this._activities = this._activities.slice(0, 50);
+        if (ActivityViewProvider._activities.length > 50) {
+            ActivityViewProvider._activities = ActivityViewProvider._activities.slice(0, 50);
         }
         
-        this._updateView();
+        // Update all instances
+        ActivityViewProvider._updateAllViews();
+    }
+
+    private static _updateAllViews() {
+        // Update all active instances
+        ActivityViewProvider._instances.forEach(instance => {
+            if (instance._view) {
+                instance._view.webview.postMessage({
+                    type: 'updateActivities',
+                    activities: ActivityViewProvider._activities
+                });
+            }
+        });
     }
 
     private _updateView() {
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'updateActivities',
-                activities: this._activities
+                activities: ActivityViewProvider._activities
             });
         }
     }
@@ -775,6 +810,9 @@ export class ActivityViewProvider implements vscode.WebviewViewProvider {
 
         // Initial render
         renderActivities();
+
+        // Request initial data load from extension
+        vscode.postMessage({ type: 'requestActivities' });
     </script>
 </body>
 </html>`;
