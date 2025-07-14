@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { ChatViewProvider } from './chatViewProvider';
-import { exec } from 'child_process';
 import { getWorkspaceInfo } from './util';
 import { ProblemDescriptionProvider } from './problemDescriptionProvider';
 
@@ -38,16 +37,20 @@ export function activate(context: vscode.ExtensionContext) {
         const message = vscode.window.setStatusBarMessage('$(sync~spin) Running codebase ...');
         try {   
                 const workspaceInfo = getWorkspaceInfo();
-                const cmd = `/bin/req ${workspaceInfo?.name} run`;
-                exec(cmd, (error, stdout, stderr) => {
-                    if (error) {
-                        vscode.window.showErrorMessage(`Run Error`);
-                        return;
-                    }
-                    if (stderr) {
-                        return;
-                    }
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                const folderName = workspaceFolder?.name || workspaceInfo?.name || 'Unknown';
+                
+                // Send WebSocket message instead of executing binary
+                const sent = chatProvider.sendMessage({
+                    type: 'VS_RUN',
+                    folder_name: folderName
                 });
+
+                if (!sent) {
+                    vscode.window.showErrorMessage(`Run failed - WebSocket not connected`);
+                } else {
+                    console.log('✅ VS_RUN message sent via WebSocket:', folderName);
+                }
             } catch (err) {
                 vscode.window.showErrorMessage(`Run failed try again`);
             }
@@ -62,16 +65,20 @@ export function activate(context: vscode.ExtensionContext) {
         const message = vscode.window.setStatusBarMessage('$(sync~spin) Submitting codebase ...');
         try {   
                 const workspaceInfo = getWorkspaceInfo();
-                const cmd = `/bin/req ${workspaceInfo?.name} submit`;
-                exec(cmd, (error, stdout, stderr) => {
-                    if (error) {
-                        vscode.window.showErrorMessage(`submit Error`);
-                        return;
-                    }
-                    if (stderr) {
-                        return;
-                    }
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                const folderName = workspaceFolder?.name || workspaceInfo?.name || 'Unknown';
+                
+                // Send WebSocket message instead of executing binary
+                const sent = chatProvider.sendMessage({
+                    type: 'VS_SUBMIT',
+                    folder_name: folderName
                 });
+
+                if (!sent) {
+                    vscode.window.showErrorMessage(`Submit failed - WebSocket not connected`);
+                } else {
+                    console.log('✅ VS_SUBMIT message sent via WebSocket:', folderName);
+                }
             } catch (err) {
                 vscode.window.showErrorMessage(`submit failed try again`);
             }

@@ -1739,6 +1739,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    // Public method to send WebSocket messages from extension commands
+    public sendMessage(data: any): boolean {
+        return this.sendWebSocketMessage(data);
+    }
+
     private sendWebSocketMessage(data: any): boolean {
         if (this._isConnected && this._webSocket?.readyState === WebSocket.OPEN) {
             try {
