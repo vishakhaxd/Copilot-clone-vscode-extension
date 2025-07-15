@@ -22,26 +22,13 @@ export class ProblemDescriptionProvider {
             console.log('🔗 WebSocket connected:', this._isConnected);
             
             // First try to get problem description from websocket
-            const problemDescriptionPath = await this.getProblemDescriptionFromWebSocket();
+            const markdownContent = await this.getProblemDescriptionFromWebSocket();
             
-            console.log('📁 Received path from WebSocket:', problemDescriptionPath);
+            // console.log('📁 Received path from WebSocket:', problemDescriptionPath);
             
-            if (problemDescriptionPath) {
-                this._markdownPath = problemDescriptionPath;
-                console.log('✅ Updated markdown path to:', this._markdownPath);
-            } else {
+            if (!markdownContent) {
                 console.log('⚠️ No path received from WebSocket, cannot display problem description');
                 vscode.window.showWarningMessage('Problem description is not available. Please ensure the backend service is running and providing the problem path.');
-                return;
-            }
-
-            if (!this._markdownPath) {
-                vscode.window.showErrorMessage('Problem description path not available. Cannot display problem description.');
-                return;
-            }
-
-            if (!fs.existsSync(this._markdownPath)) {
-                vscode.window.showErrorMessage(`Problem description file not found: ${this._markdownPath}`);
                 return;
             }
 
@@ -50,9 +37,6 @@ export class ProblemDescriptionProvider {
                 this._panel.reveal(vscode.ViewColumn.One);
                 return;
             }
-
-            // Read the problem description content
-            const markdownContent = fs.readFileSync(this._markdownPath, 'utf8');
 
             // Create a webview panel for problem description
             this._panel = vscode.window.createWebviewPanel(
@@ -383,7 +367,7 @@ export class ProblemDescriptionProvider {
                         console.log('✅ Got problem description response:', message.path);
                         clearTimeout(timeout);
                         this._webSocket?.off('message', messageHandler);
-                        resolve(message.path || null);
+                        resolve(message['message'] || null);
                     }
                 } catch (error) {
                     console.error('❌ Error parsing WebSocket response:', error);

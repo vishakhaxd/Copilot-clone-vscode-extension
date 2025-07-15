@@ -144,7 +144,7 @@ export function activate(context: vscode.ExtensionContext) {
         // extra timeout to compensate for dspcoder-panel
         setTimeout(() => {
             message.dispose();
-        }, 3000);
+        }, 5000);
     });
 
     // Register command to submit code
@@ -172,7 +172,7 @@ export function activate(context: vscode.ExtensionContext) {
         // extra timeout to compensate for dspcoder-panel
         setTimeout(() => {
             message.dispose();
-        }, 3000);
+        }, 5000);
     });
 
     context.subscriptions.push(openChatCommand, clearChatCommand, runCodeCommand, submitCodeCommand, openActivityCommand, openProblemDescriptionCommand, addTestActivityCommand);
