@@ -127,24 +127,22 @@ export function activate(context: vscode.ExtensionContext) {
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 const folderName = workspaceFolder?.name || workspaceInfo?.name || 'Unknown';
                 
-                // Send WebSocket message instead of executing binary
+                // Send WebSocket message with status bar message reference
                 const sent = chatProvider.sendMessage({
                     type: 'VS_RUN',
                     folder_name: folderName
-                });
+                }, message); // Pass the status bar message to chatProvider
 
                 if (!sent) {
                     vscode.window.showErrorMessage(`Run failed - WebSocket not connected`);
+                    message.dispose(); // Dispose immediately if failed
                 } else {
                     console.log('✅ VS_RUN message sent via WebSocket:', folderName);
                 }
             } catch (err) {
                 vscode.window.showErrorMessage(`Run failed try again`);
+                message.dispose(); // Dispose immediately if error
             }
-        // extra timeout to compensate for dspcoder-panel
-        setTimeout(() => {
-            message.dispose();
-        }, 5000);
     });
 
     // Register command to submit code
@@ -155,24 +153,22 @@ export function activate(context: vscode.ExtensionContext) {
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 const folderName = workspaceFolder?.name || workspaceInfo?.name || 'Unknown';
                 
-                // Send WebSocket message instead of executing binary
+                // Send WebSocket message with status bar message reference
                 const sent = chatProvider.sendMessage({
                     type: 'VS_SUBMIT',
                     folder_name: folderName
-                });
+                }, message); // Pass the status bar message to chatProvider
 
                 if (!sent) {
                     vscode.window.showErrorMessage(`Submit failed - WebSocket not connected`);
+                    message.dispose(); // Dispose immediately if failed
                 } else {
                     console.log('✅ VS_SUBMIT message sent via WebSocket:', folderName);
                 }
             } catch (err) {
                 vscode.window.showErrorMessage(`submit failed try again`);
+                message.dispose(); // Dispose immediately if error
             }
-        // extra timeout to compensate for dspcoder-panel
-        setTimeout(() => {
-            message.dispose();
-        }, 5000);
     });
 
     context.subscriptions.push(openChatCommand, clearChatCommand, runCodeCommand, submitCodeCommand, openActivityCommand, openProblemDescriptionCommand, addTestActivityCommand);

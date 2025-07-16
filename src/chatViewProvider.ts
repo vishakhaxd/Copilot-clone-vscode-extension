@@ -91,6 +91,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private _isConnected = false;
     private _clientId: string;
     private _reconnectTimeout?: NodeJS.Timeout;
+    
+    // Status bar message tracking for submissions
+    private _activeStatusMessages: Map<string, vscode.Disposable> = new Map();
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -1719,7 +1722,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     
                     const status = data.response.output?.metadata?.overall_status || 'Unknown';
                     
-                    // Show auto-dismissing status bar message only
+                    // Dispose the original "Submitting..." status message
+                    const submitStatusMessage = this._activeStatusMessages.get('submit');
+                    if (submitStatusMessage) {
+                        submitStatusMessage.dispose();
+                        this._activeStatusMessages.delete('submit');
+                    }
+                    
+                    // Show auto-dismissing completion status bar message
                     const statusMessage = vscode.window.setStatusBarMessage(
                         `$(check) Submission completed: ${status}`,
                         5000 // Auto-dismiss after 5 seconds
@@ -1733,7 +1743,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     
                     const status = data.response.output?.metadata?.overall_status || 'Unknown';
                     
-                    // Show auto-dismissing status bar message only
+                    // Dispose the original "Running..." status message
+                    const runStatusMessage = this._activeStatusMessages.get('run');
+                    if (runStatusMessage) {
+                        runStatusMessage.dispose();
+                        this._activeStatusMessages.delete('run');
+                    }
+                    
+                    // Show auto-dismissing completion status bar message
                     const statusMessage = vscode.window.setStatusBarMessage(
                         `$(play) Run completed: ${status}`,
                         5000 // Auto-dismiss after 5 seconds
@@ -1780,7 +1797,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     // Public method to send WebSocket messages from extension commands
-    public sendMessage(data: any): boolean {
+    public sendMessage(data: any, statusMessage?: vscode.Disposable): boolean {
+        // Store status message for submission requests
+        if (data.type === 'VS_SUBMIT' && statusMessage) {
+            this._activeStatusMessages.set('submit', statusMessage);
+        } else if (data.type === 'VS_RUN' && statusMessage) {
+            this._activeStatusMessages.set('run', statusMessage);
+        }
+        
         return this.sendWebSocketMessage(data);
     }
 
@@ -1805,6 +1829,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         if (this._webSocket) {
             this._webSocket.close();
         }
+        
+        // Clean up any active status messages
+        this._activeStatusMessages.forEach((statusMessage) => {
+            statusMessage.dispose();
+        });
+        this._activeStatusMessages.clear();
     }
 
     private async clearCheckpoints(question?: string, path?: string, mode: string = 'clear'): Promise<void> {
