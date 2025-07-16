@@ -1,4 +1,4 @@
-# DSP Cipher - VS Code Extension
+# Copilot clone - VS Code Extension
 
 GitHub Copilot clone for algorithmic problem solving and LeetCode challenges.
 
