@@ -164,6 +164,8 @@ export function activate(context: vscode.ExtensionContext) {
                     message.dispose(); // Dispose immediately if failed
                 } else {
                     console.log('✅ VS_SUBMIT message sent via WebSocket:', folderName);
+                    // Auto-popup the submission panel (activity manager) after successful submit
+                    vscode.commands.executeCommand('dsp-cipher.activity.focus');
                 }
             } catch (err) {
                 vscode.window.showErrorMessage(`submit failed try again`);
