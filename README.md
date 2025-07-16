@@ -1,16 +1,29 @@
 # DSP Cipher - VS Code Extension
 
-AI coding assistant for algorithmic problem solving and LeetCode challenges.
+GitHub Copilot clone for algorithmic problem solving and LeetCode challenges.
 
-## How to Test
+![Extension Demo](image.png)
 
-1. **Press F5** to run the extension in development mode
-2. **Look for the robot icon (🤖)** in the Activity Bar
-3. **Click it** to open the Cipher Chat panel
-4. **Type a message** and press Enter to test
+![Extension Demo](image1.png)
 
-## Core Files
+## Architecture
 
-- `src/extension.ts` - Main extension logic
-- `src/chatViewProvider.ts` - Chat interface implementation
-- `package.json` - Extension configuration
+- **Frontend**: VS Code extension with chat interface
+- **Backend**: Separate repository with AI processing
+- **Communication**: WebSocket connection for real-time responses
+
+## How it Works
+
+1. User types message in VS Code chat panel
+2. Extension sends request via **WebSocket** to backend server
+3. Backend processes request using AI models
+4. Response streams back through WebSocket
+5. Chat interface displays AI-generated code/explanations
+
+## Quick Test
+
+1. Press **F5** to run extension
+2. Click **🤖 robot icon** in Activity Bar
+3. Type coding question and press Enter
+
+**Note**: Backend server code is in a separate repository.
