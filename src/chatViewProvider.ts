@@ -565,8 +565,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     <style>
         body {
             font-family: var(--vscode-font-family);
-            background-color: #1e1e1e;
-            color: #cccccc;
+            background-color: var(--vscode-sideBar-background);
+            color: var(--vscode-foreground);
             margin: 0;
             padding: 0;
             height: 100vh;
@@ -606,7 +606,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             overflow-y: auto;
             padding: 16px;
             scroll-behavior: smooth;
-            background-color: #1e1e1e;
+            background-color: var(--vscode-sideBar-background);
         }
 
         .message {
@@ -638,18 +638,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .message.assistant .message-bubble {
-            background-color: #252525;
-            color: #cccccc;
-            border: 1px solid #404040;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-foreground);
+            border: 1px solid var(--vscode-input-border);
             white-space: normal;
             max-width: 90%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 8px var(--vscode-widget-shadow);
         }
 
         /* Markdown Styles - GitHub Copilot inspired */
         .message-bubble h1, .message-bubble h2, .message-bubble h3, .message-bubble h4, .message-bubble h5, .message-bubble h6 {
             margin: 16px 0 8px 0;
-            color: #ffffff;
+            color: var(--vscode-foreground);
             font-weight: 600;
             line-height: 1.3;
         }
@@ -661,7 +661,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         .message-bubble h1 {
             font-size: 1.6em;
-            border-bottom: 1px solid #404040;
+            border-bottom: 1px solid var(--vscode-panel-border);
             padding-bottom: 8px;
             margin-bottom: 16px;
         }
@@ -689,13 +689,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         .message-bubble h6 {
             font-size: 1em;
             font-weight: 600;
-            color: #a0a0a0;
+            color: var(--vscode-descriptionForeground);
         }
 
         .message-bubble p {
             margin: 12px 0;
             line-height: 1.6;
-            color: #cccccc;
+            color: var(--vscode-foreground);
         }
 
         .message-bubble p:first-child {
@@ -722,56 +722,56 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         .message-bubble li {
             margin: 6px 0;
             line-height: 1.6;
-            color: #cccccc;
+            color: var(--vscode-foreground);
         }
 
         .message-bubble li::marker {
-            color: #888888;
+            color: var(--vscode-descriptionForeground);
         }
 
         .message-bubble strong {
             font-weight: 600;
-            color: #ffffff;
+            color: var(--vscode-foreground);
         }
 
         .message-bubble em {
             font-style: italic;
-            color: #d0d0d0;
+            color: var(--vscode-foreground);
         }
 
         .message-bubble .inline-code {
-            background-color: #2d2d2d;
-            color: #f8f8f2;
+            background-color: var(--vscode-textCodeBlock-background);
+            color: var(--vscode-editor-foreground);
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
             font-size: 10px;
-            border: 1px solid #404040;
+            border: 1px solid var(--vscode-input-border);
         }
 
         .message-bubble .code-block-container {
             margin: 16px 0;
             border-radius: 8px;
             overflow: hidden;
-            background-color: #1e1e1e;
-            border: 1px solid #404040;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            background-color: var(--vscode-textCodeBlock-background);
+            border: 1px solid var(--vscode-input-border);
+            box-shadow: 0 2px 8px var(--vscode-widget-shadow);
         }
 
         .message-bubble .code-block-header {
-            background-color: #2d2d2d;
-            color: #a0a0a0;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-descriptionForeground);
             padding: 10px 16px;
             font-size: 0.8em;
             font-weight: 500;
-            border-bottom: 1px solid #404040;
+            border-bottom: 1px solid var(--vscode-panel-border);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .message-bubble .code-block {
-            background-color: #1e1e1e !important;
-            color: #cccccc;
+            background-color: var(--vscode-textCodeBlock-background) !important;
+            color: var(--vscode-editor-foreground);
             padding: 20px;
             margin: 0;
             font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
@@ -793,127 +793,128 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         /* Enhanced VS Code syntax highlighting */
         .message-bubble .code-block .hljs {
-            background: #1e1e1e !important;
-            color: #d4d4d4 !important;
+            background: var(--vscode-textCodeBlock-background) !important;
+            color: var(--vscode-editor-foreground) !important;
         }
 
         .message-bubble .code-block .hljs-keyword {
-            color: #569cd6 !important;
+            color: var(--vscode-symbolIcon-keywordForeground, #569cd6) !important;
             font-weight: normal;
         }
 
         .message-bubble .code-block .hljs-string {
-            color: #ce9178 !important;
+            color: var(--vscode-symbolIcon-stringForeground, #ce9178) !important;
         }
 
         .message-bubble .code-block .hljs-number {
-            color: #b5cea8 !important;
+            color: var(--vscode-symbolIcon-numberForeground, #b5cea8) !important;
         }
 
         .message-bubble .code-block .hljs-comment {
-            color: #6a9955 !important;
+            color: var(--vscode-symbolIcon-colorForeground, #6a9955) !important;
             font-style: italic;
         }
 
         .message-bubble .code-block .hljs-function {
-            color: #dcdcaa !important;
+            color: var(--vscode-symbolIcon-functionForeground, #dcdcaa) !important;
         }
 
         .message-bubble .code-block .hljs-built_in {
-            color: #4ec9b0 !important;
+            color: var(--vscode-symbolIcon-classForeground, #4ec9b0) !important;
         }
 
         .message-bubble .code-block .hljs-class {
-            color: #4ec9b0 !important;
+            color: var(--vscode-symbolIcon-classForeground, #4ec9b0) !important;
         }
 
         .message-bubble .code-block .hljs-variable {
-            color: #9cdcfe !important;
+            color: var(--vscode-symbolIcon-variableForeground, #9cdcfe) !important;
         }
 
         .message-bubble .code-block .hljs-type {
-            color: #4ec9b0 !important;
+            color: var(--vscode-symbolIcon-classForeground, #4ec9b0) !important;
         }
 
         .message-bubble .code-block .hljs-literal {
-            color: #569cd6 !important;
+            color: var(--vscode-symbolIcon-keywordForeground, #569cd6) !important;
         }
 
         .message-bubble .code-block .hljs-operator {
-            color: #d4d4d4 !important;
+            color: var(--vscode-editor-foreground, #d4d4d4) !important;
         }
 
         .message-bubble .code-block .hljs-punctuation {
-            color: #d4d4d4 !important;
+            color: var(--vscode-editor-foreground, #d4d4d4) !important;
         }
 
         .message-bubble .code-block .hljs-property {
-            color: #9cdcfe !important;
+            color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe) !important;
         }
 
         .message-bubble .code-block .hljs-attr {
-            color: #92c5f8 !important;
+            color: var(--vscode-symbolIcon-propertyForeground, #92c5f8) !important;
         }
 
         .message-bubble .code-block .hljs-tag {
-            color: #569cd6 !important;
+            color: var(--vscode-symbolIcon-keywordForeground, #569cd6) !important;
         }
 
         .message-bubble .code-block .hljs-name {
-            color: #4fc1ff !important;
+            color: var(--vscode-symbolIcon-classForeground, #4fc1ff) !important;
         }
 
         .message-bubble .code-block .hljs-title {
-            color: #dcdcaa !important;
+            color: var(--vscode-symbolIcon-functionForeground, #dcdcaa) !important;
         }
 
         .message-bubble .code-block .hljs-params {
-            color: #9cdcfe !important;
+            color: var(--vscode-symbolIcon-variableForeground, #9cdcfe) !important;
         }
 
         /* Additional markdown elements */
         .message-bubble blockquote {
-            border-left: 3px solid #404040;
+            border-left: 3px solid var(--vscode-panel-border);
             margin: 16px 0;
             padding: 8px 0 8px 16px;
-            color: #a0a0a0;
+            color: var(--vscode-descriptionForeground);
             font-style: italic;
-            background-color: rgba(64, 64, 64, 0.1);
+            background-color: var(--vscode-textCodeBlock-background);
         }
 
         .message-bubble table {
             border-collapse: collapse;
             margin: 16px 0;
             width: 100%;
-            border: 1px solid #404040;
+            border: 1px solid var(--vscode-panel-border);
         }
 
         .message-bubble th, .message-bubble td {
-            border: 1px solid #404040;
+            border: 1px solid var(--vscode-panel-border);
             padding: 8px 12px;
             text-align: left;
         }
 
         .message-bubble th {
-            background-color: #2d2d2d;
+            background-color: var(--vscode-editor-background);
             font-weight: 600;
-            color: #ffffff;
+            color: var(--vscode-foreground);
+        }
         }
 
         .message-bubble hr {
             border: none;
-            border-top: 1px solid #404040;
+            border-top: 1px solid var(--vscode-panel-border);
             margin: 20px 0;
         }
 
         /* Links styling */
         .message-bubble a {
-            color: #4fc1ff;
+            color: var(--vscode-textLink-foreground);
             text-decoration: none;
         }
 
         .message-bubble a:hover {
-            color: #6bb6ff;
+            color: var(--vscode-textLink-activeForeground);
             text-decoration: underline;
         }
 
@@ -965,13 +966,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         .input-container {
             padding: 12px;
-            background-color: #2b2b2b;
-            border-top: 1px solid #404040;
+            background-color: var(--vscode-panel-background);
+            border-top: 1px solid var(--vscode-panel-border);
             flex-shrink: 0;
         }
 
         .input-wrapper {
-            background-color: #404040;
+            background-color: var(--vscode-input-background);
             border: 1px solid transparent;
             border-radius: 24px;
             padding: 6px 12px;
@@ -983,8 +984,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             box-sizing: border-box;
             position: relative;
             background-image: 
-                linear-gradient(#404040, #404040),
-                linear-gradient(90deg, #d6fb41, #a8d132, #d6fb41, #b8e138, #d6fb41);
+                linear-gradient(var(--vscode-input-background), var(--vscode-input-background)),
+                linear-gradient(90deg, var(--vscode-focusBorder), var(--vscode-button-background), var(--vscode-focusBorder), var(--vscode-button-background), var(--vscode-focusBorder));
             background-origin: border-box;
             background-clip: padding-box, border-box;
             animation: borderFlow 3s linear infinite;
@@ -1001,8 +1002,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         .input-wrapper:focus-within {
             background-image: 
-                linear-gradient(#4a4a4a, #4a4a4a),
-                linear-gradient(90deg, #d6fb41, #a8d132, #d6fb41, #b8e138, #d6fb41);
+                linear-gradient(var(--vscode-input-background), var(--vscode-input-background)),
+                linear-gradient(90deg, var(--vscode-focusBorder), var(--vscode-button-background), var(--vscode-focusBorder), var(--vscode-button-background), var(--vscode-focusBorder));
             animation: borderFlowFocus 2s linear infinite;
             outline: none !important;
             box-shadow: none !important;
@@ -1024,7 +1025,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         .mode-select {
             background-color: transparent;
-            color: #999999;
+            color: var(--vscode-descriptionForeground);
             border: none;
             border-radius: 4px;
             padding: 2px 14px 2px 4px;
@@ -1042,14 +1043,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .mode-select:hover {
-            background-color: #505050;
-            color: #cccccc;
+            background-color: var(--vscode-list-hoverBackground);
+            color: var(--vscode-foreground);
             outline: none !important;
         }
 
         .mode-select:focus {
-            background-color: #505050;
-            color: #cccccc;
+            background-color: var(--vscode-list-hoverBackground);
+            color: var(--vscode-foreground);
             outline: none !important;
             box-shadow: none !important;
             border: none !important;
@@ -1061,8 +1062,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .mode-select option {
-            background-color: #404040;
-            color: #cccccc;
+            background-color: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
             padding: 4px 8px;
             font-size: 11px;
         }
@@ -1074,7 +1075,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;
-            color: #999999;
+            color: var(--vscode-descriptionForeground);
             font-size: 8px;
             opacity: 0.7;
         }
@@ -1082,7 +1083,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         .message-input {
             flex: 1;
             background-color: transparent;
-            color: #cccccc;
+            color: var(--vscode-input-foreground);
             border: none;
             padding: 6px 8px;
             font-family: var(--vscode-font-family);
@@ -1112,14 +1113,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .message-input::placeholder {
-            color: #888888;
+            color: var(--vscode-input-placeholderForeground);
             font-size: 13px;
         }
 
         .send-button {
             background-color: transparent;
-            color: #d6fb41;
-            border: 1px solid #d6fb41;
+            color: var(--vscode-focusBorder);
+            border: 1px solid var(--vscode-focusBorder);
             border-radius: 4px;
             width: 28px;
             height: 28px;
@@ -1135,9 +1136,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         .send-button:hover {
-            background-color: transparent;
-            color: #d6fb41;
-            border: 1px solid #d6fb41;
+            background-color: var(--vscode-focusBorder);
+            color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-focusBorder);
             outline: none !important;
         }
 
@@ -1153,16 +1154,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         .send-button:disabled {
             background-color: transparent;
-            color: #666666;
-            border: 1px solid #666666;
+            color: var(--vscode-disabledForeground);
+            border: 1px solid var(--vscode-disabledForeground);
             cursor: not-allowed;
             outline: none !important;
         }
 
         .send-button:disabled:hover {
             background-color: transparent;
-            color: #666666;
-            border: 1px solid #666666;
+            color: var(--vscode-disabledForeground);
+            border: 1px solid var(--vscode-disabledForeground);
             outline: none !important;
         }
 
